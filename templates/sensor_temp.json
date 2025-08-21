@@ -1,0 +1,25 @@
+{
+  "serial_prefix": "TMP0",
+  "nombre": "Sensor de Temperatura Generico",
+  "tipo": "sensor",
+  "modelo": "ST-1000",
+  "descripcion": "Sensor de temperatura",
+  "configuracion": {
+    "intervalo_envio": 5,
+    "apagar": "off"
+  },
+  "parametros": {
+    "temperatura": {
+      "tipo": "float",
+      "min": 20.0,
+      "max": 30.0,
+      "variacion": 0.3
+    },
+    "humedad": {
+      "tipo": "int",
+      "min": 30,
+      "max": 70,
+      "variacion": 2
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "serial_prefix": "MOV0",
+  "nombre": "Sensor de Movimiento",
+  "tipo": "sensor",
+  "modelo": "MOV-200",
+  "descripcion": "Sensor binario de movimiento",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "apagar": "off"
+  },
+  "parametros": {
+    "movimiento": {
+      "tipo": "boolean",
+      "prob_flip": 0.05
+    }
+  }
+}

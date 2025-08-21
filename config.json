@@ -1,0 +1,7 @@
+{
+  "mqtt_host": "localhost",
+  "mqtt_port": 1883,
+  "mqtt_topic_estado": "dispositivos/estado",
+  "backend_url": "http://localhost:5000",
+  "poll_config_interval": 3
+}
