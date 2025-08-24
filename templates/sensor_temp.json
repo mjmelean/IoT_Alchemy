@@ -6,7 +6,7 @@
   "descripcion": "Sensor de temperatura",
   "configuracion": {
     "intervalo_envio": 5,
-    "apagar": "off"
+    "encendido": true
   },
   "parametros": {
     "temperatura": {

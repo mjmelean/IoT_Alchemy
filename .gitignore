@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Archivo del script de organizacion
+textify.py
+
 # Distribution / packaging
 .Python
 build/

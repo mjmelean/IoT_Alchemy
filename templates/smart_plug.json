@@ -6,7 +6,7 @@
   "descripcion": "Medidor de consumo electrico",
   "configuracion": {
     "intervalo_envio": 6,
-    "apagar": "off"
+    "encendido": true
   },
   "parametros": {
     "consumo_w": {

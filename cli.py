@@ -3,6 +3,7 @@ import time
 from templates_loader import cargar_plantillas
 from manager import DevicesManager
 from gen_qr import generar_qr_reclamo
+from utils import reclamar_dispositivo, modificar_dispositivo, listar_dispositivos_backend
 
 def show_menu():
     print("\n=== IoT Alchemy CLI ===")
@@ -15,7 +16,9 @@ def show_menu():
     print("7) Simular apagado / encendido")
     print("8) Iniciar simulación de todos")
     print("9) Detener simulación de todos")
-    print("10) Generar QR de dispositivo")
+    print("10) Generar QR de dispositivo (Abre Navegador)")
+    print("11) Reclamar dispositivo vía HTTP (PowerShell y cURL)")
+    print("12) Modificar datos vía HTTP (PowerShell y cURL)")
     print("0) Salir")
 
 def iniciar_cli():
@@ -138,6 +141,13 @@ def iniciar_cli():
         elif opt == "10":
             serial = input("Ingrese el serial del dispositivo: ").strip()
             generar_qr_reclamo(serial, templates)
+        
+        elif opt == "11":
+            serial = input("Ingrese el serial del dispositivo: ")
+            reclamar_dispositivo(serial, list(templates.values()))
+
+        elif opt == "12":
+            modificar_dispositivo()
 
         elif opt == "0":
             print("Saliendo...")

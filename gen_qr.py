@@ -21,7 +21,7 @@ def generar_qr_reclamo(serial, templates_dict):
 
         # Datos mínimos para el reclamo
         data = {
-            "serial": serial,
+            "serial_number": serial,
             "nombre": template.get("nombre", ""),
             "tipo": template.get("tipo", ""),
             "modelo": template.get("modelo", ""),

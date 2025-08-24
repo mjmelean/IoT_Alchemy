@@ -6,7 +6,7 @@
   "descripcion": "Sensor binario de movimiento",
   "configuracion": {
     "intervalo_envio": 10,
-    "apagar": "off"
+    "encendido": true
   },
   "parametros": {
     "movimiento": {

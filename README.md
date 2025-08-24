@@ -1,62 +1,89 @@
-# IoT Alchemy
+# ⚗️ IoT Alchemy
 
-## Descripcion
+## 📝 Descripción
 
-**IoT Alchemy** es un simulador de dispositivos IoT basado en CLI.  
-Permite crear dispositivos a partir de plantillas JSON, iniciar su simulacion y generar QR para su reclamo.
+**IoT Alchemy** es un simulador de dispositivos IoT basado en CLI. Permite crear dispositivos a partir de plantillas JSON, iniciar su simulación y generar QR para su reclamo.
 
-###  Funcionalidades
+### 🛠️ Funcionalidades
 
 -   Crear dispositivos desde plantillas (`/templates/*.json`)
+    
+-   Iniciar/detener simulaciones individuales o múltiples.
+    
+-   Modificar parámetros en tiempo real.
+    
+-   Generar QR con datos de reclamo para app móvil (abre en navegador).
+    
+-   Reclamar y modificar dispositivos (PowerShell y cURL)
+    
+-   Integración directa con el **Backend IoT** 🚀 vía MQTT y HTTP.
+    
 
--   Iniciar/detener simulaciones individuales o multiples.
-    
--   Modificar parametros en tiempo real.
-    
--   Generar QR con datos de reclamo para app movil (abre en navegador).
-    
--   Integracion directa con el **Backend IoT** via MQTT y HTTP.
-    
+👉 [**Click aqui para instalar cURL**](https://curl.se/download.html)
+⚙️ [**Click aqui para ir a IoT BackEnd**](https://github.com/mjmelean/IoT_Backend)
 
-----------
-
-## Estructura IoT Alchemy
+## 📁 Estructura de IoT Alchemy
 
 ```
-IoT-Alchemy/
-templates/       # Plantillas JSON
-cli.py           # CLI principal
-device.py		 # Simulador de dispositivos
-manager.py		 # Gestion general de dispositivos
-gen_qr.py        # Generacion de QR
-templates_loader.py # Carga plantillas .json
-main.py          # Entrada
-utils.py		 # funciones utiles
-config.json		 # configuracion del simulador
+    |--cli.py
+    |--config.json
+    |--device.py
+    |--gen_qr.py
+    |--main.py
+    |--manager.py
+    |--templates_loader.py
+    |--utils.py
+    |--scripts/
+        |--modificar.ps1
+        |--reclamar.ps1
+    |--templates/
+        |--sensor_mov.json
+        |--sensor_temp.json
+        |--otras plantillas.....
+
 ```
-----------
 
-##  Opciones del CLI
+-   `cli.py` 💻 〞 CLI principal.
+    
+-   `device.py` 📱 〞 Simulador de dispositivos.
+    
+-   `manager.py` ⚙️ 〞 Gestión general de dispositivos.
+    
+-   `gen_qr.py` 🔳 〞 Generación de QR.
+    
+-   `templates_loader.py` 📄 〞 Cargador de plantillas .json.
+    
+-   `utils.py` 🔧 〞 Configuracion de la app (base de datos, MQTT).
+    
+-   `config.json` ⚙️ 〞 Configuración del IoT Alchemy.
+    
+-   `main.py` 🚀 〞 Ejecución de IoT Alchemy.
+    
+-   `templates/` 📂 〞 Ubicación de plantillas.
+    
+-   `scripts/` 📜 〞 Ubicación de scripts (PowerShell y cURL).
+    
 
-Menu:
+## 📋 Opciones del CLI
+
 ```
 1) Listar plantillas
 2) Crear dispositivo desde plantilla
 3) Listar dispositivos activos
-4) Iniciar simulaci��n de un dispositivo
-5) Detener simulaci��n de un dispositivo
-6) Modificar par��metros de un dispositivo (en vivo)
+4) Iniciar simulacion de un dispositivo
+5) Detener simulacion de un dispositivo
+6) Modificar parametros de un dispositivo (en vivo)
 7) Simular apagado / encendido
-8) Iniciar simulaci��n de todos
-9) Detener simulaci��n de todos
+8) Iniciar simulacion de todos
+9) Detener simulacion de todos
 10) Generar QR de dispositivo (Abre navegador)
-11) Reclamar dispositivo (Via Powershell)
+11) Reclamar dispositivo via HTTP (PowerShell y cURL)
+12) Modificar datos via HTTP (PowerShell y cURL)
 0) Salir
+
 ```
 
-----------
-
-##  Ejemplo de plantilla
+## 📄 Ejemplo de plantilla
 
 ```json
 {
@@ -67,7 +94,7 @@ Menu:
   "descripcion": "Sensor de temperatura",
   "configuracion": {
     "intervalo_envio": 5,
-    "apagar": "off"
+    "encendido": true
   },
   "parametros": {
     "temperatura": {
@@ -82,13 +109,12 @@ Menu:
       "max": 70,
       "variacion": 2
     }
-   }
-  }
+    }
+}
+
 ```
 
-----------
-
-##  Ejemplo de QR generado
+## 🔳 Ejemplo de QR generado
 
 ```json
 {
@@ -99,13 +125,8 @@ Menu:
   "descripcion": "Sensor de temperatura",
   "configuracion": {
     "intervalo_envio": 5,
-    "apagar": "off"
+    "encendido": true
   }
 }
-```
 
-Se envia directamente al backend en:
-
-```
-/dispositivos/reclamar
 ```
