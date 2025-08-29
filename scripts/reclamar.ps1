@@ -28,7 +28,7 @@ try {
     $response = Invoke-RestMethod -Uri "http://localhost:5000/dispositivos/reclamar" `
                                   -Method POST `
                                   -Body $json `
-                                  -ContentType 'application/json'
+                                  -ContentType 'application/json; charset=utf-8'
 
     Write-Host "Respuesta del backend:"
     $response | ConvertTo-Json -Depth 5

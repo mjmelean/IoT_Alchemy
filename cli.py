@@ -12,13 +12,12 @@ def show_menu():
     print("3) Listar dispositivos activos")
     print("4) Iniciar simulación de un dispositivo")
     print("5) Detener simulación de un dispositivo")
-    print("6) Modificar parámetros de un dispositivo (en vivo)")
-    print("7) Simular apagado / encendido")
-    print("8) Iniciar simulación de todos")
-    print("9) Detener simulación de todos")
-    print("10) Generar QR de dispositivo (Abre Navegador)")
-    print("11) Reclamar dispositivo vía HTTP (PowerShell y cURL)")
-    print("12) Modificar datos vía HTTP (PowerShell y cURL)")
+    print("6) Modificar parámetros de un dispositivo (en vivo-inyeccion de errores)")
+    print("7) Iniciar simulación de todos")
+    print("8) Detener simulación de todos")
+    print("9) Generar QR de dispositivo (Abre Navegador)")
+    print("10) Reclamar dispositivo vía HTTP (PowerShell y cURL)")
+    print("11) Modificar datos vía HTTP (PowerShell y cURL)")
     print("0) Salir")
 
 def iniciar_cli():
@@ -115,38 +114,22 @@ def iniciar_cli():
                     print("Parámetro actualizado.")
 
         elif opt == "7":
-            s = input("Serial del dispositivo: ").strip()
-            d = manager.get(s)
-            if not d:
-                print("No encontrado.")
-            else:
-                action = input("Apagar (a) / Encender (e): ").strip().lower()
-                if action == "a":
-                    d.apagar()
-                    print("Dispositivo apagado (estado=inactivo).")
-                elif action == "e":
-                    d.encender()
-                    print("Dispositivo encendido (estado=activo).")
-                else:
-                    print("Opción inválida.")
-
-        elif opt == "8":
             manager.start_all()
             print("Todas las simulaciones iniciadas.")
 
-        elif opt == "9":
+        elif opt == "8":
             manager.stop_all()
             print("Todas las simulaciones detenidas.")
 
-        elif opt == "10":
+        elif opt == "9":
             serial = input("Ingrese el serial del dispositivo: ").strip()
             generar_qr_reclamo(serial, templates)
         
-        elif opt == "11":
+        elif opt == "10":
             serial = input("Ingrese el serial del dispositivo: ")
             reclamar_dispositivo(serial, list(templates.values()))
 
-        elif opt == "12":
+        elif opt == "11":
             modificar_dispositivo()
 
         elif opt == "0":

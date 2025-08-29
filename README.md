@@ -11,6 +11,8 @@
 -   Iniciar/detener simulaciones individuales o múltiples.
     
 -   Modificar parámetros en tiempo real.
+
+-   Inyeccion de errores para pruebas (al modificar parametros y excederse del max o min).
     
 -   Generar QR con datos de reclamo para app móvil (abre en navegador).
     
@@ -53,7 +55,7 @@
     
 -   `templates_loader.py` 📄 〞 Cargador de plantillas .json.
     
--   `utils.py` 🔧 〞 Configuracion de la app (base de datos, MQTT).
+-   `utils.py` 🔧 〞 Utiliades de IoT Alchemy.
     
 -   `config.json` ⚙️ 〞 Configuración del IoT Alchemy.
     
@@ -73,12 +75,11 @@
 4) Iniciar simulacion de un dispositivo
 5) Detener simulacion de un dispositivo
 6) Modificar parametros de un dispositivo (en vivo)
-7) Simular apagado / encendido
-8) Iniciar simulacion de todos
-9) Detener simulacion de todos
-10) Generar QR de dispositivo (Abre navegador)
-11) Reclamar dispositivo via HTTP (PowerShell y cURL)
-12) Modificar datos via HTTP (PowerShell y cURL)
+7) Iniciar simulacion de todos
+8) Detener simulacion de todos
+9) Generar QR de dispositivo (Abre navegador)
+10) Reclamar dispositivo via HTTP (PowerShell y cURL)
+11) Modificar datos via HTTP (PowerShell y cURL)
 0) Salir
 
 ```

@@ -1,16 +1,23 @@
-# manager.py
 import os
 import json
 from device import DeviceSimulator
 from utils import generar_serial
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    CONFIG = json.load(f)
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar config.json: {e}")
+        return {}
+    
 
 class DevicesManager:
     def __init__(self):
         self.devices = {}  # serial -> DeviceSimulator
+        self.config = load_config()
 
     def create_from_template(self, template, count=1, serial_custom=None):
         """
@@ -26,17 +33,16 @@ class DevicesManager:
 
         for serial in seriales:
             params_rules = template.get("parametros", {}) or {}
-            # intervalo inicial: si el template lo trae, lo usamos
             interval = int(template.get("configuracion", {}).get("intervalo_envio", 5))
 
             d = DeviceSimulator(
                 serial=serial,
                 parametros_rules=params_rules,
-                mqtt_topic=CONFIG.get("mqtt_topic_estado", "dispositivos/estado"),
+                mqtt_topic=self.config.get("mqtt_topic_estado", "dispositivos/estado"),
                 interval=interval,
-                mqtt_host=CONFIG.get("mqtt_host", "localhost"),
-                backend_url=CONFIG.get("backend_url"),               # solo para LECTURA de config
-                poll_config_interval=CONFIG.get("poll_config_interval", 3)
+                mqtt_host=self.config.get("mqtt_host", "localhost"),
+                backend_url=self.config.get("backend_url"),
+                poll_config_interval=self.config.get("poll_config_interval", 3)
             )
             self.devices[serial] = d
             created.append(d)

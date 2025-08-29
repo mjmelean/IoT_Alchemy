@@ -1,0 +1,19 @@
+{
+  "serial_prefix": "CO20",
+  "nombre": "Sensor de CO₂",
+  "tipo": "sensor",
+  "modelo": "C2-300",
+  "descripcion": "Medidor de concentración de dióxido de carbono en ppm",
+  "configuracion": {
+    "intervalo_envio": 12,
+    "encendido": true
+  },
+  "parametros": {
+    "co2_ppm": {
+      "tipo": "int",
+      "min": 400,
+      "max": 2000,
+      "variacion": 50
+    }
+  }
+}

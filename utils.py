@@ -7,7 +7,25 @@ import os
 import requests
 
 SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 
+## Cargar Config
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar config.json: {e}")
+        return {}
+
+def get_backend_url(path=""):
+    config = load_config()
+    base_url = config.get("backend_url", "http://localhost:5000").rstrip("/")
+    if path:
+        return f"{base_url}/{path.lstrip('/')}"
+    return base_url
+
+## Genera serial 
 def generar_serial(prefix="DEV", length=8):
     rand_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
     return f"{prefix}{rand_part}"
@@ -15,9 +33,9 @@ def generar_serial(prefix="DEV", length=8):
 def clamp(v, mn, mx):
     return max(mn, min(mx, v))
 
-def listar_dispositivos_backend(base_url="http://localhost:5000"):
+def listar_dispositivos_backend():
     try:
-        resp = requests.get(f"{base_url}/dispositivos")
+        resp = requests.get(get_backend_url("dispositivos"))
         if resp.status_code == 200:
             return resp.json()
         else:
@@ -27,7 +45,7 @@ def listar_dispositivos_backend(base_url="http://localhost:5000"):
         print(f"❌ No se pudo conectar al backend: {e}")
         return []
 
-#Utilizado opcion 11
+#Utilizado opcion 10
 def reclamar_dispositivo(serial, templates):
     prefix = serial[:4]
     template = next((t for t in templates if t.get("serial_prefix") == prefix), None)
@@ -57,12 +75,11 @@ def reclamar_dispositivo(serial, templates):
         "-configuracion", json.dumps(payload["configuracion"])
     ])
 
-#Utilizado opcion 12
-
-def modificar_dispositivo(base_url="http://localhost:5000"):
+#Utilizado opcion 11
+def modificar_dispositivo():
     serial = input("Ingrese el serial del dispositivo a modificar: ").strip()
+    dispositivos = listar_dispositivos_backend()
 
-    dispositivos = listar_dispositivos_backend(base_url)
     if not dispositivos:
         print("❌ No hay dispositivos en el backend o no se pudo conectar.")
         return
@@ -116,5 +133,4 @@ def modificar_dispositivo(base_url="http://localhost:5000"):
         ])
     except Exception as e:
         print(f"❌ Error al ejecutar script PowerShell: {e}")
-
 

@@ -1,0 +1,19 @@
+{
+  "serial_prefix": "LUX0",
+  "nombre": "Sensor de Luz",
+  "tipo": "sensor",
+  "modelo": "LX-500",
+  "descripcion": "Sensor de intensidad luminosa en lux",
+  "configuracion": {
+    "intervalo_envio": 8,
+    "encendido": true
+  },
+  "parametros": {
+    "luz_lux": {
+      "tipo": "float",
+      "min": 0.0,
+      "max": 1000.0,
+      "variacion": 20.0
+    }
+  }
+}

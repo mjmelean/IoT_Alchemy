@@ -1,11 +1,18 @@
 # device.py
 import json
+import os
 import time
 import threading
 import random
 import requests
 from paho.mqtt import publish
 from utils import clamp
+
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    CONFIG = json.load(f)
+
 
 class DeviceSimulator:
     """
@@ -22,17 +29,18 @@ class DeviceSimulator:
         self,
         serial,
         parametros_rules,
-        mqtt_topic="dispositivos/estado",
+        mqtt_topic=None,
         interval=5,
-        mqtt_host="localhost",
+        mqtt_host=None,
         backend_url=None,
-        poll_config_interval=3
+        poll_config_interval=None
     ):
         self.serial = serial
         self.param_rules = parametros_rules or {}
-        self.mqtt_topic = mqtt_topic
+        self.mqtt_topic = mqtt_topic or CONFIG.get("mqtt_topic_estado", "dispositivos/estado")
+        self.mqtt_host = mqtt_host or CONFIG.get("mqtt_host", "localhost")
+        self.backend_url = backend_url or CONFIG.get("backend_url")
         self.interval = max(1, int(interval))
-        self.mqtt_host = mqtt_host
 
         # Flags e hilos
         self.running = False
@@ -56,13 +64,18 @@ class DeviceSimulator:
                 self.parametros[k] = rule.get("default")
 
         # Config remota (solo lectura)
-        self.backend_url = backend_url
-        self.poll_config_interval = max(1, int(poll_config_interval))
+        self.poll_config_interval = max(1, int(poll_config_interval or CONFIG.get("poll_config_interval", 3)))
         self._device_id = None  # cache para GET /dispositivos/<id>
+        self.inyecciones = {k: False for k in self.param_rules}
+
 
     # ----------- Simulación -----------
     def _step(self):
         for k, rule in self.param_rules.items():
+            # Si está en modo inyección, no lo tocamos
+            if self.inyecciones.get(k, False):
+                continue
+
             t = rule.get("tipo")
             if t in ("float", "double"):
                 var = rule.get("variacion", (rule.get("max", 1) - rule.get("min", 0)) * 0.05)
@@ -78,6 +91,7 @@ class DeviceSimulator:
                 prob = rule.get("prob_flip", 0.01)
                 if random.random() < prob:
                     self.parametros[k] = not bool(self.parametros.get(k, False))
+
 
     def _estado_str(self):
         return "inactivo" if self.apagado else "activo"
@@ -162,9 +176,17 @@ class DeviceSimulator:
 
     def set_parametro(self, key, value):
         if key in self.parametros:
+            mn = self.param_rules[key].get("min", float("-inf"))
+            mx = self.param_rules[key].get("max", float("inf"))
+            # Si está fuera del rango, marcamos como inyección
+            if isinstance(value, (int, float)) and (value < mn or value > mx):
+                self.inyecciones[key] = True
+            else:
+                self.inyecciones[key] = False
             self.parametros[key] = value
             return True
         return False
+
 
     def set_parametros_bulk(self, new_params: dict):
         for k, v in new_params.items():

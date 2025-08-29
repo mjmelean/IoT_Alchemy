@@ -11,7 +11,7 @@ try {
     $response = curl -Uri $url `
                      -Method Put `
                      -Body $payload `
-                     -ContentType "application/json"
+                     -ContentType "application/json; charset=utf-8"
 
     Write-Host "📡 Respuesta del servidor:"
     Write-Host $response

@@ -1,0 +1,19 @@
+{
+  "serial_prefix": "SND0",
+  "nombre": "Sensor de Ruido",
+  "tipo": "sensor",
+  "modelo": "SN-200",
+  "descripcion": "Medidor de niveles sonoros en decibeles",
+  "configuracion": {
+    "intervalo_envio": 7,
+    "encendido": true
+  },
+  "parametros": {
+    "db": {
+      "tipo": "float",
+      "min": 30.0,
+      "max": 120.0,
+      "variacion": 5.0
+    }
+  }
+}
