@@ -131,3 +131,5 @@
 }
 
 ```
+
+![Código QR para la página de ejemplo](https://i.postimg.cc/FHgMqvMg/qr-TMP0-YBHV71-SA.png)
