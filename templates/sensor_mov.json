@@ -6,12 +6,16 @@
   "descripcion": "Sensor binario de movimiento",
   "configuracion": {
     "intervalo_envio": 10,
-    "encendido": true
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+    {"dias": ["todos"], "inicio": "21:25", "fin": "21:30"}
+  ]
   },
   "parametros": {
     "movimiento": {
       "tipo": "boolean",
-      "prob_flip": 0.05
+      "prob_flip": 0.01
     }
   }
 }

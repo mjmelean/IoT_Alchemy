@@ -6,7 +6,9 @@
   "descripcion": "Medidor de niveles sonoros en decibeles",
   "configuracion": {
     "intervalo_envio": 7,
-    "encendido": true
+    "encendido": true,
+    "modo": "manual"
+
   },
   "parametros": {
     "db": {

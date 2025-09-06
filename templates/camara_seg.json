@@ -6,7 +6,13 @@
   "descripcion": "Cámara IP con transmisión de video y detección de movimiento",
   "configuracion": {
     "intervalo_envio": 15,
-    "encendido": true
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      {"dias": ["sabado","domingo"], "inicio": "00:00", "fin": "23:59"},
+      {"dias": ["lunes","martes","miercoles","jueves","viernes"], "inicio": "20:00", "fin": "07:00"}
+]
+
   },
   "parametros": {
     "stream_activo": {

@@ -6,7 +6,9 @@
   "descripcion": "Sensor de intensidad luminosa en lux",
   "configuracion": {
     "intervalo_envio": 8,
-    "encendido": true
+    "encendido": true,
+    "modo": "manual"
+
   },
   "parametros": {
     "luz_lux": {

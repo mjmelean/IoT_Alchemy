@@ -6,7 +6,9 @@
   "descripcion": "Medidor de consumo electrico",
   "configuracion": {
     "intervalo_envio": 6,
-    "encendido": true
+    "encendido": true,
+    "modo": "manual"
+
   },
   "parametros": {
     "consumo_w": {

@@ -75,7 +75,7 @@ def reclamar_dispositivo(serial, templates):
         "-configuracion", json.dumps(payload["configuracion"])
     ])
 
-#Utilizado opcion 11
+# Utilizado opcion 11
 def modificar_dispositivo():
     serial = input("Ingrese el serial del dispositivo a modificar: ").strip()
     dispositivos = listar_dispositivos_backend()
@@ -110,16 +110,44 @@ def modificar_dispositivo():
         return
 
     campo = opciones[choice]
-    nuevo_valor = input(f"Ingrese el nuevo valor para {campo}: ").strip()
 
+    # ---- Caso especial para configuración ----
     if campo == "configuracion":
+        print("Ingrese el JSON parcial con los cambios (ej: {\"modo\": \"horario\"}):")
+        raw_valor = input("> ").strip()
         try:
-            nuevo_valor = json.loads(nuevo_valor)
-        except json.JSONDecodeError:
-            print("❌ Configuración debe ser un JSON válido (ejemplo: {\"intervalo_medicion\": 60, \"encendido\": true })")
+            nuevo_valor = json.loads(raw_valor)
+            if not isinstance(nuevo_valor, dict):
+                print("❌ La configuración debe ser un objeto JSON (ej: {\"encendido\": true})")
+                return
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON inválido: {e}")
             return
 
-    payload = {campo: nuevo_valor}
+        # Tomar la configuración actual como base
+        config_actual = dispositivo.get("configuracion", {}).copy()
+        config_actual.update(nuevo_valor)
+
+        # Normalización de modo
+        modo = config_actual.get("modo")
+        if modo == "horario" and "encendido" in config_actual:
+            # Si es horario → eliminamos encendido
+            del config_actual["encendido"]
+            print(" ✅Cambiado 'modo': 'horario';  ❌Eliminado 'encendido'")
+        elif modo == "manual" and "horarios" in config_actual:
+            # Si es manual → eliminamos horarios
+            del config_actual["horarios"]
+            print(" ✅Cambiado 'modo': 'Manual' ❌Eliminado 'horarios'")
+
+        payload = {"configuracion": config_actual}
+
+    else:
+        # Para nombre, tipo, modelo o descripcion
+        nuevo_valor = input(f"Ingrese el nuevo valor para {campo}: ").strip()
+        if not nuevo_valor:
+            print("❌ El valor no puede estar vacío.")
+            return
+        payload = {campo: nuevo_valor}
 
     print("📤 Enviando actualización al backend...")
 
@@ -133,4 +161,3 @@ def modificar_dispositivo():
         ])
     except Exception as e:
         print(f"❌ Error al ejecutar script PowerShell: {e}")
-

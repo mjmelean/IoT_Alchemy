@@ -5,14 +5,26 @@ import time
 import threading
 import random
 import requests
+import datetime
 from paho.mqtt import publish
 from utils import clamp
-
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     CONFIG = json.load(f)
 
+# Mapa de equivalencias español -> inglés
+DAY_MAP = {
+    "lunes": "monday",
+    "martes": "tuesday",
+    "miercoles": "wednesday",
+    "miércoles": "wednesday",
+    "jueves": "thursday",
+    "viernes": "friday",
+    "sabado": "saturday",
+    "sábado": "saturday",
+    "domingo": "sunday",
+}
 
 class DeviceSimulator:
     """
@@ -23,6 +35,7 @@ class DeviceSimulator:
     para aplicar configuraciones:
       configuracion.intervalo_envio -> self.interval
       configuracion.encendido (True/False) -> self.apagado
+      configuracion.modo ("manual"/"horario") -> define comportamiento
     """
 
     def __init__(
@@ -68,11 +81,12 @@ class DeviceSimulator:
         self._device_id = None  # cache para GET /dispositivos/<id>
         self.inyecciones = {k: False for k in self.param_rules}
 
+        # Último encendido sincronizado al backend
+        self._last_encendido_sync = None
 
     # ----------- Simulación -----------
     def _step(self):
         for k, rule in self.param_rules.items():
-            # Si está en modo inyección, no lo tocamos
             if self.inyecciones.get(k, False):
                 continue
 
@@ -92,7 +106,6 @@ class DeviceSimulator:
                 if random.random() < prob:
                     self.parametros[k] = not bool(self.parametros.get(k, False))
 
-
     def _estado_str(self):
         return "inactivo" if self.apagado else "activo"
 
@@ -107,7 +120,6 @@ class DeviceSimulator:
         payload = self.build_mqtt_payload()
         try:
             publish.single(self.mqtt_topic, json.dumps(payload), hostname=self.mqtt_host)
-            # print(f"[MQTT] {self.serial} -> {payload}")
         except Exception as e:
             print("[MQTT ERROR]", e)
 
@@ -117,7 +129,6 @@ class DeviceSimulator:
                 self._step()
                 self.publish_estado()
             else:
-                # En apagado igual publicamos (estado=inactivo) para que el backend lo vea
                 self.publish_estado()
             time.sleep(self.interval)
 
@@ -126,7 +137,6 @@ class DeviceSimulator:
         if not self.backend_url or self._device_id is not None:
             return
         try:
-            # Buscar ID por serial (GET /dispositivos)
             r = requests.get(f"{self.backend_url}/dispositivos", timeout=5)
             if r.status_code == 200:
                 lista = r.json()
@@ -136,8 +146,80 @@ class DeviceSimulator:
         except Exception as e:
             print(f"[CFG] Error buscando ID para {self.serial}: {e}")
 
+    def _sync_encendido_to_backend(self, cfg):
+        """Sincroniza encendido al backend solo si cambió."""
+        if not (self.backend_url and self._device_id is not None):
+            return
+        new_val = bool(cfg.get("encendido"))
+        if self._last_encendido_sync is not None and self._last_encendido_sync == new_val:
+            return  # no hay cambios
+        try:
+            resp = requests.put(
+                f"{self.backend_url}/dispositivos/{self._device_id}",
+                json={"configuracion": cfg, "encendido": new_val},
+                timeout=5
+            )
+            if resp.status_code in (200, 204):
+                self._last_encendido_sync = new_val
+        except Exception as e:
+            print(f"[CFG] Error sincronizando estado con backend: {e}")
+
+    def _aplicar_config(self, cfg):
+        # Si no hay modo → dispositivo no reclamado todavía
+        modo = cfg.get("modo")
+        if not modo:
+            print(f"[CFG] {self.serial} aún no reclamado, ignorando configuración")
+            return
+
+        if modo == "manual":
+            # En manual: encendido manda, estado escucha
+            encendido = cfg.get("encendido", True)
+            self.apagado = not bool(encendido)
+
+        elif modo == "horario":
+            # En horario: estado manda, encendido escucha
+            ahora = datetime.datetime.now()
+            dia_actual = ahora.strftime("%A").lower()
+
+            activo = False
+            for h in cfg.get("horarios", []):
+                dias_cfg = [d.lower() for d in h.get("dias", ["todos"])]
+                dias_norm = []
+                for d in dias_cfg:
+                    if d in DAY_MAP:
+                        dias_norm.append(DAY_MAP[d])
+                    else:
+                        dias_norm.append(d)
+
+                if "todos" in dias_norm or "all" in dias_norm or dia_actual in dias_norm:
+                    try:
+                        start_str = h.get("inicio") or h.get("start")
+                        end_str   = h.get("fin")    or h.get("end")
+                        if not (start_str and end_str):
+                            continue
+                        ini = datetime.datetime.strptime(start_str, "%H:%M").time()
+                        fin = datetime.datetime.strptime(end_str, "%H:%M").time()
+
+                        if ini < fin:
+                            if ini <= ahora.time() <= fin:
+                                activo = True
+                        else:  # cruza medianoche
+                            if ahora.time() >= ini or ahora.time() <= fin:
+                                activo = True
+                    except Exception as e:
+                        print(f"[CFG] Horario inválido: {h} ({e})")
+
+            # Estado manda
+            self.apagado = not activo
+            cfg["encendido"] = activo
+            self._sync_encendido_to_backend(cfg)
+
+        # Intervalo de envío
+        intervalo = cfg.get("intervalo_envio")
+        if isinstance(intervalo, (int, float)) and intervalo > 0:
+            self.interval = int(intervalo)
+
     def _poll_remote_config(self):
-        """Lee periódicamente /dispositivos/<id> y aplica configuracion."""
         while self.running and self.backend_url:
             try:
                 self._ensure_device_id()
@@ -146,14 +228,7 @@ class DeviceSimulator:
                     if r.status_code == 200:
                         data = r.json()
                         cfg = data.get("configuracion") or {}
-                        # Encendido/Apagado
-                        encendido = cfg.get("encendido")
-                        if encendido is not None:
-                            self.apagado = not bool(encendido)
-                        # Intervalo de envío
-                        intervalo = cfg.get("intervalo_envio")
-                        if isinstance(intervalo, (int, float)) and intervalo > 0:
-                            self.interval = int(intervalo)
+                        self._aplicar_config(cfg)
             except Exception as e:
                 print(f"[CFG] Error leyendo configuración remota: {e}")
             time.sleep(self.poll_config_interval)
@@ -178,7 +253,6 @@ class DeviceSimulator:
         if key in self.parametros:
             mn = self.param_rules[key].get("min", float("-inf"))
             mx = self.param_rules[key].get("max", float("inf"))
-            # Si está fuera del rango, marcamos como inyección
             if isinstance(value, (int, float)) and (value < mn or value > mx):
                 self.inyecciones[key] = True
             else:
@@ -186,7 +260,6 @@ class DeviceSimulator:
             self.parametros[key] = value
             return True
         return False
-
 
     def set_parametros_bulk(self, new_params: dict):
         for k, v in new_params.items():

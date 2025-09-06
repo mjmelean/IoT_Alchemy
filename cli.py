@@ -16,6 +16,7 @@ def show_menu():
     print("7) Iniciar simulación de todos")
     print("8) Detener simulación de todos")
     print("9) Generar QR de dispositivo (Abre Navegador)")
+    print("++++++++++++++ Simulaciones de Front-End ++++++++++++++")
     print("10) Reclamar dispositivo vía HTTP (PowerShell y cURL)")
     print("11) Modificar datos vía HTTP (PowerShell y cURL)")
     print("0) Salir")
