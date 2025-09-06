@@ -291,9 +291,9 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
 
 "intervalo_envio":  15,
 
-"encendido":  true,
+"encendido":  en modo horario se ignora, por lo que no aplica,
 
-"modo":  "manual",
+"modo":  "horario",
 
 "horarios": [
 
