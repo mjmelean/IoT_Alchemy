@@ -238,7 +238,7 @@
 
 ![Código QR para la página de ejemplo](https://i.postimg.cc/15PFwVg2/qr-TMP0-YBHV71-SA.png)
 
-## 📖 Explicación de `configuracion {}`
+## ⚙️ Explicación de `configuracion {}`
 
 Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define su comportamiento. IoT Alchemy interpreta este bloque así:
 
@@ -281,7 +281,7 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
   * Los horarios que cruzan medianoche son soportados (ej. `inicio: "22:00"`, `fin: "06:00"`).
 
 
-## 📄 Ejemplo de configuracion con horarios habilitados
+## ⚙️⏰ Ejemplo de configuracion con horarios habilitados
 
   
 
