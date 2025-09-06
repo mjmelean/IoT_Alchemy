@@ -1,0 +1,20 @@
+{
+  "serial_prefix": "FAN0",
+  "nombre": "Ventilador Inteligente",
+  "tipo": "actuador",
+  "modelo": "FAN-300",
+  "descripcion": "Ventilador con control de velocidad inteligente",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": false,
+    "modo": "manual"
+  },
+  "parametros": {
+    "velocidad": {
+      "tipo": "int",
+      "min": 0,
+      "max": 3,
+      "variacion": 1
+    }
+  }
+}

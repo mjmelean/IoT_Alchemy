@@ -1,0 +1,14 @@
+{
+  "serial_prefix": "SHD0",
+  "nombre": "Persiana Inteligente",
+  "tipo": "actuador",
+  "modelo": "SHD-400",
+  "descripcion": "Control de apertura y cierre de persianas",
+  "configuracion": {
+    "intervalo_envio": 8,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "serial_prefix": "DRL0",
+  "nombre": "Puerta Inteligente",
+  "tipo": "actuador",
+  "modelo": "DR-200",
+  "descripcion": "Puerta con cerradura inteligente y control remoto",
+  "configuracion": {
+    "intervalo_envio": 12,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+
+  }
+}

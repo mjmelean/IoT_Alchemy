@@ -1,0 +1,27 @@
+{
+  "serial_prefix": "CAM0",
+  "nombre": "Cámara de Seguridad",
+  "tipo": "actuador",
+  "modelo": "CAM-900",
+  "descripcion": "Cámara IP con transmisión de video y detección de movimiento",
+  "configuracion": {
+    "intervalo_envio": 15,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      {"dias": ["sabado","domingo"], "inicio": "00:00", "fin": "23:59"},
+      {"dias": ["lunes","martes","miercoles","jueves","viernes"], "inicio": "20:00", "fin": "07:00"}
+]
+
+  },
+  "parametros": {
+    "stream_activo": {
+      "tipo": "boolean",
+      "prob_flip": 0.02
+    },
+    "alertas_movimiento": {
+      "tipo": "boolean",
+      "prob_flip": 0.1
+    }
+  }
+}

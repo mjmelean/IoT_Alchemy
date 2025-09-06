@@ -1,0 +1,16 @@
+{
+  "serial_prefix": "LGT0",
+  "nombre": "Luces Automáticas",
+  "tipo": "actuador",
+  "modelo": "LGT-300",
+  "descripcion": "Sistema de iluminación con encendido y apagado automático",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      { "dias": ["todos"], "inicio": "18:00", "fin": "06:00" }
+    ]
+  },
+  "parametros": {}
+}

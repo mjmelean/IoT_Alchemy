@@ -1,0 +1,16 @@
+{
+  "serial_prefix": "RGD0",
+  "nombre": "Regador Automático",
+  "tipo": "actuador",
+  "modelo": "RG-500",
+  "descripcion": "Sistema automático de riego programado",
+  "configuracion": {
+    "intervalo_envio": 20,
+    "encendido": false,
+    "modo": "manual",
+    "horarios": [
+      { "dias": ["lunes","miercoles","viernes"], "inicio": "06:00", "fin": "06:15" }
+    ]
+  },
+  "parametros": {}
+}
