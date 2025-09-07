@@ -180,9 +180,9 @@
 
 Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define su comportamiento. IoT Alchemy interpreta este bloque así:
 
-* **`intervalo_envio`**
+* **`intervalo_envio`** ⏱️
 
-  ⏱️ Intervalo (en segundos) en el que el dispositivo publica su estado y parámetros vía MQTT.
+  Intervalo (en segundos) en el que el dispositivo publica su estado y parámetros vía MQTT.
 
 * **`encendido`** 🔌 (Valido en `modo: manual` )
 	
