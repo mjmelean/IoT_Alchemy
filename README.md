@@ -180,19 +180,21 @@
 
 Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define su comportamiento. IoT Alchemy interpreta este bloque así:
 
-* **`intervalo_envio`** ⏱️
-  Intervalo (en segundos) en el que el dispositivo publica su estado y parámetros vía MQTT.
+* **`intervalo_envio`**
+
+  ⏱️ Intervalo (en segundos) en el que el dispositivo publica su estado y parámetros vía MQTT.
 
 * **`encendido`** 🔌 (Valido en `modo: manual` )
 	
-   * Controla cuando quiere que el dispositivo se encienda o apague.
+  * Controla cuando quiere que el dispositivo se encienda o apague.
   * `true` → dispositivo activo (`estado = "activo"`)
   * `false` → dispositivo apagado (`estado = "inactivo"`).
   * Solo válido en `modo: manual`.
   * Si el dispositivo está en `modo: horario`, este campo se ignora/elimina.
 
 * **`modo`** ⚙️
-  Define quién controla el estado del dispositivo:
+
+   Define quién controla el estado del dispositivo:
 
   * `"manual"` → El usuario/IA controla directamente con `encendido`.
   * `"horario"` → El estado se calcula automáticamente en base a `horarios`.
