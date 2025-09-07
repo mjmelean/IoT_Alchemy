@@ -198,7 +198,6 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
   * `"horario"` → El estado se calcula automáticamente en base a `horarios`.
 
 * **`horarios`** 📅 (Valido en `modo: horario` )
-  Solo válido en `modo: horario`.
   Lista de rangos de tiempo en los que el dispositivo estará activo. Puede especificarse el dia o todos los dias.
   Ejemplo:
 
