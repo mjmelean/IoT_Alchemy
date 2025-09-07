@@ -44,7 +44,6 @@
   
 
 ```
-
 |--cli.py
 |--config.json
 |--device.py
@@ -60,7 +59,6 @@
 	|-- sensor_mov.json
 	|-- sensor_temp.json
 	|-- otras plantillas.....
-
 ```
 
   
@@ -91,7 +89,6 @@
   
 
 ```
-
 1) Listar plantillas
 2) Crear dispositivo desde plantilla
 3) Listar dispositivos activos
@@ -106,13 +103,10 @@
 11) Modificar datos via HTTP (PowerShell y cURL)
 0) Salir
 
-  
-
 ```
 ## 📄 Ejemplo de plantilla
 
 ```json
-
 {
 
 "serial_prefix":  "TMP0",
@@ -145,7 +139,6 @@
 }
 
 }
-
 ```
 
   
@@ -155,9 +148,7 @@
   
 
 ```json
-
 {
-
 "serial":  "TMP0YBHV71SA",
 "nombre":  "Sensor de Temperatura Generico",
 "tipo":  "sensor",
@@ -168,7 +159,6 @@
 	"encendido":  true,
 	"modo":"manual"
 }
-
 }
 ```
 
@@ -226,7 +216,6 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
   
 
 ```json
-
 "configuracion": {
 "intervalo_envio":  15,
 "encendido":  en modo horario se ignora, por lo que no aplica,
@@ -241,16 +230,16 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
 ## 🔄 Diagrama de flujo de `configuracion`
 
 ```
-          +-------------+
-          |   ¿Modo?    |
-          +------+------+
-                 |
-        +--------+--------+
-        |                 |
-+-------v-------+   +-------v-------+
-|   MANUAL      |   |   HORARIO     |
-+-------+-------+   +-------+-------+
-        |                    |
+              +-------------+
+              |   ¿Modo?    |
+              +------+------+
+                     |
+        +------------+--------------+
+        |                           |
++-------v-------+           +-------v-------+
+|   MANUAL      |           |   HORARIO     |
++-------+-------+           +-------+-------+
+        |                           |
 +-------v---------------+   +-------v---------------+
 | 'encendido' controla  |   | 'horarios' controlan  |
 +-------+---------------+   +-------+---------------+
@@ -259,8 +248,7 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
 | estado = 'encendido'  |   | 'encendido' se ignora |
 +-------+---------------+   +-------+---------------+
         |                           |
-+-------v---------------+   +-------v---------------+
-| Salida: true/false    |   | Salida: activo/inactivo |
-+-----------------------+   +-----------------------+
-          
++-------v-----------------+   +-----v-------------------+
+| 'encendido': true/false |   | Salida: activo/inactivo |
++-------------------------+   +-------------------------+
 ```
