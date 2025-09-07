@@ -240,15 +240,15 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
 |   MANUAL      |           |   HORARIO     |
 +-------+-------+           +-------+-------+
         |                           |
-+-------v---------------+   +-------v---------------+
-| 'encendido' controla  |   | 'horarios' controlan  |
-+-------+---------------+   +-------+---------------+
++-------v---------------+   +-------v-------------------+
+| 'encendido' controla  |   |  estado/horarios controla |
++-------+---------------+   +-------+-------------------+
         |                           |
 +-------v---------------+   +-------v---------------+
 | estado = 'encendido'  |   | 'encendido' se ignora |
 +-------+---------------+   +-------+---------------+
         |                           |
 +-------v-----------------+   +-----v-------------------+
-| 'encendido': true/false |   | Salida: activo/inactivo |
+| 'encendido': true/false |   | estado: activo/inactivo |
 +-------------------------+   +-------------------------+
 ```
