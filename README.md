@@ -46,41 +46,24 @@
 ```
 
 |--cli.py
-
 |--config.json
-
 |--device.py
-
 |--gen_qr.py
-
 |--main.py
-
 |--manager.py
-
 |--templates_loader.py
-
 |--utils.py
-
 |--scripts/
-
-|--modificar.ps1
-
-|--reclamar.ps1
-
+|---------- modificar.ps1
+|---------- reclamar.ps1
 |--templates/
-
-|--sensor_mov.json
-
-|--sensor_temp.json
-
-|--otras plantillas.....
-
-  
+|---------- sensor_mov.json
+|---------- sensor_temp.json
+|---------- otras plantillas.....
 
 ```
 
   
-
 -  `cli.py` 💻 〞 CLI principal.
 
 -  `device.py` 📱 〞 Simulador de dispositivos.
@@ -110,90 +93,54 @@
 ```
 
 1) Listar plantillas
-
 2) Crear dispositivo desde plantilla
-
 3) Listar dispositivos activos
-
 4) Iniciar simulacion de un dispositivo
-
 5) Detener simulacion de un dispositivo
-
 6) Modificar parametros de un dispositivo (en vivo)
-
 7) Iniciar simulacion de todos
-
 8) Detener simulacion de todos
-
 9) Generar QR de dispositivo (Abre navegador)
-
 ++++++++++++++ Simulaciones de Front-End ++++++++++++++
-
 10) Reclamar dispositivo via HTTP (PowerShell y cURL)
-
 11) Modificar datos via HTTP (PowerShell y cURL)
-
 0) Salir
 
   
 
 ```
-
-  
-
 ## 📄 Ejemplo de plantilla
-
-  
 
 ```json
 
 {
 
 "serial_prefix":  "TMP0",
-
 "nombre":  "Sensor de Temperatura Generico",
-
 "tipo":  "sensor",
-
 "modelo":  "ST-1000",
-
 "descripcion":  "Sensor de temperatura",
 
 "configuracion": {
-
-"intervalo_envio":  5,
-
-"encendido":  true,
-
-"modo":"manual"
-
+	"intervalo_envio":  5,
+	"encendido":  true,
+	"modo":"manual"
 },
 
 "parametros": {
+	"temperatura": {
+		"tipo":  "float",
+		"min":  20.0,
+		"max":  30.0,
+		"variacion":  0.3
+	},
 
-"temperatura": {
-
-"tipo":  "float",
-
-"min":  20.0,
-
-"max":  30.0,
-
-"variacion":  0.3
-
-},
-
-"humedad": {
-
-"tipo":  "int",
-
-"min":  30,
-
-"max":  70,
-
-"variacion":  2
-
-}
+	"humedad": {
+		"tipo":  "int",
+		"min":  30,
+		"max":  70,
+		"variacion":  2
+	}
 
 }
 
@@ -212,23 +159,14 @@
 {
 
 "serial":  "TMP0YBHV71SA",
-
 "nombre":  "Sensor de Temperatura Generico",
-
 "tipo":  "sensor",
-
 "modelo":  "ST-1000",
-
 "descripcion":  "Sensor de temperatura",
-
 "configuracion": {
-
-"intervalo_envio":  5,
-
-"encendido":  true,
-
-"modo":"manual"
-
+	"intervalo_envio":  5,
+	"encendido":  true,
+	"modo":"manual"
 }
 
 }
@@ -288,24 +226,15 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
 ```json
 
 "configuracion": {
-
 "intervalo_envio":  15,
-
 "encendido":  en modo horario se ignora, por lo que no aplica,
-
 "modo":  "horario",
-
 "horarios": [
-
 	{"dias": ["sabado","domingo"], "inicio":  "00:00", "fin":  "23:59"},
-
 	{"dias": ["lunes","martes","miercoles","jueves","viernes"], "inicio":  "20:00", "fin":  "07:00"}
-
 ]
-
 }
 ```
-
 
 ## 🔄 Diagrama de flujo de `configuracion`
 
