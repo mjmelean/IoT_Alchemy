@@ -54,12 +54,12 @@
 |--templates_loader.py
 |--utils.py
 |--scripts/
-|---------- modificar.ps1
-|---------- reclamar.ps1
+	|-- modificar.ps1
+	|-- reclamar.ps1
 |--templates/
-|---------- sensor_mov.json
-|---------- sensor_temp.json
-|---------- otras plantillas.....
+	|-- sensor_mov.json
+	|-- sensor_temp.json
+	|-- otras plantillas.....
 
 ```
 
@@ -174,7 +174,7 @@
 
   
 
-![Código QR para la página de ejemplo](https://i.postimg.cc/15PFwVg2/qr-TMP0-YBHV71-SA.png)
+![Código QR para la página de ejemplo](https://i.postimg.cc/Y0pkVB9M/qr-TMP0-YBHV71-SA.png)
 
 ## ⚙️ Explicación de `configuracion {}`
 
