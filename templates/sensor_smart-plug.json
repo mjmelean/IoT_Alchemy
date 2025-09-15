@@ -1,0 +1,21 @@
+{
+  "serial_prefix": "PLG0",
+  "nombre": "Smart Plug",
+  "tipo": "actuador",
+  "modelo": "SP-100",
+  "descripcion": "Medidor de consumo electrico",
+  "configuracion": {
+    "intervalo_envio": 6,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "consumo_w": {
+      "tipo": "float",
+      "min": 0.0,
+      "max": 2000.0,
+      "variacion": 50.0
+    }
+  }
+}

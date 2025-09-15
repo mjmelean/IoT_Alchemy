@@ -1,0 +1,2334 @@
+Iot alchemy+++++++++++++++++++++++++++++++++++
+Estructura de Archivos-----------------------
+    |--cli.py
+    |--config.json
+    |--device.py
+    |--gen_qr.py
+    |--iot.txt
+    |--main.py
+    |--manager.py
+    |--templates_loader.py
+    |--utils.py
+    |--scripts/
+        |--modificar.ps1
+        |--reclamar.ps1
+    |--templates/
+        |--camara-seg_auto.json
+        |--luces_auto.json
+        |--persiana_auto.json
+        |--puerta_auto.json
+        |--regador_auto.json
+        |--sensor_co2.json
+        |--sensor_humo.json
+        |--sensor_luz.json
+        |--sensor_mov.json
+        |--sensor_ruido.json
+        |--sensor_smart-plug.json
+        |--sensor_temp.json
+        |--vent_auto.json
+
+Contenido de Archivos-----------------------
+
+cli.py----------------------------------------
+# cli.py
+import time
+from templates_loader import cargar_plantillas
+from manager import DevicesManager
+from gen_qr import generar_qr_reclamo
+from utils import reclamar_dispositivo, modificar_dispositivo, listar_dispositivos_backend
+
+def show_menu():
+    print("\n=== IoT Alchemy CLI ===")
+    print("1) Listar plantillas")
+    print("2) Crear dispositivo desde plantilla")
+    print("3) Listar dispositivos activos")
+    print("4) Iniciar simulación de un dispositivo")
+    print("5) Detener simulación de un dispositivo")
+    print("6) Modificar parámetros de un dispositivo (en vivo-inyeccion de errores)")
+    print("7) Iniciar simulación de todos")
+    print("8) Detener simulación de todos")
+    print("9) Generar QR de dispositivo (Abre Navegador)")
+    print("++++++++++++++ Simulaciones de Front-End ++++++++++++++")
+    print("10) Reclamar dispositivo vía HTTP (PowerShell y cURL)")
+    print("11) Modificar datos vía HTTP (PowerShell y cURL)")
+    print("0) Salir")
+
+def iniciar_cli():
+    templates = cargar_plantillas()
+    manager = DevicesManager()
+
+    while True:
+        show_menu()
+        opt = input("Opción: ").strip()
+        if opt == "1":
+            if not templates:
+                print("No hay plantillas en /templates")
+            else:
+                print("Plantillas:")
+                for name in templates:
+                    print(" -", name)
+
+        elif opt == "2":
+            print("Seleccione plantilla:")
+            keys = list(templates.keys())
+            if not keys:
+                print("No hay plantillas.")
+                continue
+            for i, k in enumerate(keys, 1):
+                print(f"{i}) {k}")
+            sel = input("Número: ").strip()
+            try:
+                idx = int(sel) - 1
+                tpl = templates[keys[idx]]
+            except Exception:
+                print("Selección inválida.")
+                continue
+
+            serial_custom = input("Serial personalizado (ENTER para aleatorio): ").strip() or None
+            cnt = input("¿Cuántos dispositivos crear? (1): ").strip() or "1"
+            try:
+                cnt = int(cnt)
+            except Exception:
+                cnt = 1
+
+            created = manager.create_from_template(tpl, count=cnt, serial_custom=serial_custom)
+            for d in created:
+                print(f"Creado: {d.serial} (intervalo: {d.interval}s)")
+
+        elif opt == "3":
+            devs = manager.list_devices()
+            if not devs:
+                print("No hay dispositivos creados.")
+            else:
+                for d in devs:
+                    print(f"- {d.serial} | apagado:{d.apagado} | intervalo:{d.interval}s | params:{d.parametros}")
+
+        elif opt == "4":
+            s = input("Serial del dispositivo a iniciar: ").strip()
+            d = manager.get(s)
+            if not d:
+                print("No encontrado.")
+            else:
+                d.start()
+                print("Simulación iniciada.")
+
+        elif opt == "5":
+            s = input("Serial del dispositivo a detener: ").strip()
+            d = manager.get(s)
+            if not d:
+                print("No encontrado.")
+            else:
+                d.stop()
+                print("Simulación detenida.")
+
+        elif opt == "6":
+            s = input("Serial del dispositivo: ").strip()
+            d = manager.get(s)
+            if not d:
+                print("No encontrado.")
+            else:
+                print("Parámetros actuales:", d.parametros)
+                key = input("Parámetro a modificar: ").strip()
+                if key not in d.parametros:
+                    print("Parámetro no existe.")
+                else:
+                    val = input("Nuevo valor: ").strip()
+                    if val.lower() in ("true", "false"):
+                        newv = val.lower() == "true"
+                    else:
+                        try:
+                            if "." in val:
+                                newv = float(val)
+                            else:
+                                newv = int(val)
+                        except Exception:
+                            newv = val
+                    d.set_parametro(key, newv)
+                    print("Parámetro actualizado.")
+
+        elif opt == "7":
+            manager.start_all()
+            print("Todas las simulaciones iniciadas.")
+
+        elif opt == "8":
+            manager.stop_all()
+            print("Todas las simulaciones detenidas.")
+
+        elif opt == "9":
+            serial = input("Ingrese el serial del dispositivo: ").strip()
+            generar_qr_reclamo(serial, templates)
+        
+        elif opt == "10":
+            serial = input("Ingrese el serial del dispositivo: ")
+            reclamar_dispositivo(serial, list(templates.values()))
+
+        elif opt == "11":
+            modificar_dispositivo()
+
+        elif opt == "0":
+            print("Saliendo...")
+            manager.stop_all()
+            break
+        else:
+            print("Opción inválida.")
+        time.sleep(0.2)
+config.json----------------------------------------
+{
+  "mqtt_host": "localhost",
+  "mqtt_port": 1883,
+  "mqtt_topic_estado": "dispositivos/estado",
+  "backend_url": "http://localhost:5000",
+  "poll_config_interval": 3
+}
+
+device.py----------------------------------------
+# device.py
+import json
+import os
+import time
+import threading
+import random
+import requests
+import datetime
+from paho.mqtt import publish
+from utils import clamp
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    CONFIG = json.load(f)
+
+# Mapa de equivalencias español -> inglés
+DAY_MAP = {
+    "lunes": "monday",
+    "martes": "tuesday",
+    "miercoles": "wednesday",
+    "miércoles": "wednesday",
+    "jueves": "thursday",
+    "viernes": "friday",
+    "sabado": "saturday",
+    "sábado": "saturday",
+    "domingo": "sunday",
+}
+
+class DeviceSimulator:
+    """
+    Publica SOLO por MQTT:
+      { "serial_number", "estado", "parametros" }
+
+    No envía nada por HTTP. Opcionalmente LEE (GET) del backend
+    para aplicar configuraciones:
+      configuracion.intervalo_envio -> self.interval
+      configuracion.encendido (True/False) -> self.apagado
+      configuracion.modo ("manual"/"horario") -> define comportamiento
+    """
+
+    def __init__(
+        self,
+        serial,
+        parametros_rules,
+        mqtt_topic=None,
+        interval=5,
+        mqtt_host=None,
+        backend_url=None,
+        poll_config_interval=None
+    ):
+        self.serial = serial
+        self.param_rules = parametros_rules or {}
+        self.mqtt_topic = mqtt_topic or CONFIG.get("mqtt_topic_estado", "dispositivos/estado")
+        self.mqtt_host = mqtt_host or CONFIG.get("mqtt_host", "localhost")
+        self.backend_url = backend_url or CONFIG.get("backend_url")
+        self.interval = max(1, int(interval))
+
+        # Flags e hilos
+        self.running = False
+        self._thread = None
+        self._cfg_thread = None
+
+        # Estado/params
+        self.apagado = False  # apagado=True -> estado="inactivo"
+        self.parametros = {}
+        for k, rule in self.param_rules.items():
+            mn = rule.get("min", 0)
+            mx = rule.get("max", 1)
+            t = rule.get("tipo")
+            if t in ("float", "double"):
+                self.parametros[k] = round(random.uniform(mn, mx), 2)
+            elif t == "int":
+                self.parametros[k] = random.randint(int(mn), int(mx))
+            elif t == "boolean":
+                self.parametros[k] = random.choice([True, False])
+            else:
+                self.parametros[k] = rule.get("default")
+
+        # Config remota (solo lectura)
+        self.poll_config_interval = max(1, int(poll_config_interval or CONFIG.get("poll_config_interval", 3)))
+        self._device_id = None  # cache para GET /dispositivos/<id>
+        self.inyecciones = {k: False for k in self.param_rules}
+
+        # Último encendido sincronizado al backend
+        self._last_encendido_sync = None
+
+    # ----------- Simulación -----------
+    def _step(self):
+        for k, rule in self.param_rules.items():
+            if self.inyecciones.get(k, False):
+                continue
+
+            t = rule.get("tipo")
+            if t in ("float", "double"):
+                var = rule.get("variacion", (rule.get("max", 1) - rule.get("min", 0)) * 0.05)
+                cur = float(self.parametros.get(k, 0))
+                nuevo = clamp(cur + random.uniform(-var, var), rule.get("min", cur), rule.get("max", cur))
+                self.parametros[k] = round(nuevo, 3)
+            elif t == "int":
+                var = rule.get("variacion", 1)
+                cur = int(self.parametros.get(k, 0))
+                nuevo = int(clamp(cur + random.randint(-var, var), rule.get("min", cur), rule.get("max", cur)))
+                self.parametros[k] = nuevo
+            elif t == "boolean":
+                prob = rule.get("prob_flip", 0.01)
+                if random.random() < prob:
+                    self.parametros[k] = not bool(self.parametros.get(k, False))
+
+    def _estado_str(self):
+        return "inactivo" if self.apagado else "activo"
+
+    def build_mqtt_payload(self):
+        return {
+            "serial_number": self.serial,
+            "estado": self._estado_str(),
+            "parametros": self.parametros
+        }
+
+    def publish_estado(self):
+        payload = self.build_mqtt_payload()
+        try:
+            publish.single(self.mqtt_topic, json.dumps(payload), hostname=self.mqtt_host)
+        except Exception as e:
+            print("[MQTT ERROR]", e)
+
+    def _run(self):
+        while self.running:
+            if not self.apagado:
+                self._step()
+                self.publish_estado()
+            else:
+                self.publish_estado()
+            time.sleep(self.interval)
+
+    # ----------- Config remota (solo lectura HTTP GET) -----------
+    def _ensure_device_id(self):
+        if not self.backend_url or self._device_id is not None:
+            return
+        try:
+            r = requests.get(f"{self.backend_url}/dispositivos", timeout=5)
+            if r.status_code == 200:
+                lista = r.json()
+                match = next((d for d in lista if d.get("serial_number") == self.serial), None)
+                if match:
+                    self._device_id = match["id"]
+        except Exception as e:
+            print(f"[CFG] Error buscando ID para {self.serial}: {e}")
+
+    def _sync_encendido_to_backend(self, cfg):
+        """Sincroniza encendido (y estado) al backend solo si cambió."""
+        if not (self.backend_url and self._device_id is not None):
+            return
+
+        new_val = bool(cfg.get("encendido"))
+        if self._last_encendido_sync is not None and self._last_encendido_sync == new_val:
+            return  # no hay cambios
+
+        # 🔸 Enviar estado explícito si estamos en modo horario
+        payload = {"configuracion": cfg, "encendido": new_val}
+        modo = (cfg.get("modo") or "").lower()
+        if modo == "horario":
+            payload["estado"] = "activo" if new_val else "inactivo"
+
+        try:
+            resp = requests.put(
+                f"{self.backend_url}/dispositivos/{self._device_id}",
+                json=payload,
+                timeout=5
+            )
+            if resp.status_code in (200, 204):
+                self._last_encendido_sync = new_val
+        except Exception as e:
+            print(f"[CFG] Error sincronizando estado con backend: {e}")
+
+
+    def _aplicar_config(self, cfg):
+        # Si no hay modo → dispositivo no reclamado todavía
+        modo = cfg.get("modo")
+        if not modo:
+            print(f"[CFG] {self.serial} aún no reclamado, ignorando configuración")
+            return
+
+        if modo == "manual":
+            # En manual: encendido manda, estado escucha
+            encendido = cfg.get("encendido", True)
+            self.apagado = not bool(encendido)
+
+        elif modo == "horario":
+            # En horario: estado manda, encendido escucha
+            ahora = datetime.datetime.now()
+            dia_actual = ahora.strftime("%A").lower()
+
+            activo = False
+            for h in cfg.get("horarios", []):
+                dias_cfg = [d.lower() for d in h.get("dias", ["todos"])]
+                dias_norm = []
+                for d in dias_cfg:
+                    if d in DAY_MAP:
+                        dias_norm.append(DAY_MAP[d])
+                    else:
+                        dias_norm.append(d)
+
+                if "todos" in dias_norm or "all" in dias_norm or dia_actual in dias_norm:
+                    try:
+                        start_str = h.get("inicio") or h.get("start")
+                        end_str   = h.get("fin")    or h.get("end")
+                        if not (start_str and end_str):
+                            continue
+                        ini = datetime.datetime.strptime(start_str, "%H:%M").time()
+                        fin = datetime.datetime.strptime(end_str, "%H:%M").time()
+
+                        if ini < fin:
+                            if ini <= ahora.time() <= fin:
+                                activo = True
+                        else:  # cruza medianoche
+                            if ahora.time() >= ini or ahora.time() <= fin:
+                                activo = True
+                    except Exception as e:
+                        print(f"[CFG] Horario inválido: {h} ({e})")
+
+            # Estado manda
+            self.apagado = not activo
+            cfg["encendido"] = activo
+            cfg["modo"] = "horario"  # 🔸 asegurar que el modo viaja
+            self._sync_encendido_to_backend(cfg)
+
+        # Intervalo de envío
+        intervalo = cfg.get("intervalo_envio")
+        if isinstance(intervalo, (int, float)) and intervalo > 0:
+            self.interval = int(intervalo)
+
+    def _poll_remote_config(self):
+        while self.running and self.backend_url:
+            try:
+                self._ensure_device_id()
+                if self._device_id is not None:
+                    r = requests.get(f"{self.backend_url}/dispositivos/{self._device_id}", timeout=5)
+                    if r.status_code == 200:
+                        data = r.json()
+                        cfg = data.get("configuracion") or {}
+                        self._aplicar_config(cfg)
+            except Exception as e:
+                print(f"[CFG] Error leyendo configuración remota: {e}")
+            time.sleep(self.poll_config_interval)
+
+    # ----------- API pública -----------
+    def start(self):
+        if self.running:
+            return
+        self.running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        if self.backend_url:
+            self._cfg_thread = threading.Thread(target=self._poll_remote_config, daemon=True)
+            self._cfg_thread.start()
+
+    def stop(self):
+        self.running = False
+        if self._thread:
+            self._thread.join(timeout=1)
+
+    def set_parametro(self, key, value):
+        if key in self.parametros:
+            mn = self.param_rules[key].get("min", float("-inf"))
+            mx = self.param_rules[key].get("max", float("inf"))
+            if isinstance(value, (int, float)) and (value < mn or value > mx):
+                self.inyecciones[key] = True
+            else:
+                self.inyecciones[key] = False
+            self.parametros[key] = value
+            return True
+        return False
+
+    def set_parametros_bulk(self, new_params: dict):
+        for k, v in new_params.items():
+            if k in self.parametros:
+                self.parametros[k] = v
+
+    def apagar(self):
+        self.apagado = True
+
+    def encender(self):
+        self.apagado = False
+
+gen_qr.py----------------------------------------
+# gen_qr.py
+import qrcode
+import json
+import webbrowser
+import os
+import tempfile
+import threading
+import time
+
+def generar_qr_reclamo(serial, templates_dict):
+    def worker():
+        prefix = serial[:4]  # usamos sufijo de 4 caracteres
+        template = next(
+            (tpl for tpl in templates_dict.values() if tpl.get("serial_prefix") == prefix),
+            None
+        )
+
+        if not template:
+            print(f"No se encontró template para prefijo {prefix}")
+            return
+
+        # Datos mínimos para el reclamo
+        data = {
+            "serial_number": serial,
+            "nombre": template.get("nombre", ""),
+            "tipo": template.get("tipo", ""),
+            "modelo": template.get("modelo", ""),
+            "descripcion": template.get("descripcion", ""),
+            "configuracion": template.get("configuracion", {})
+        }
+
+        # Crear QR en archivo temporal
+        tmpdir = tempfile.gettempdir()
+        img_path = os.path.join(tmpdir, f"qr_{serial}.png")
+        qr = qrcode.make(json.dumps(data, ensure_ascii=False))
+        qr.save(img_path)
+
+        # Crear un HTML temporal que muestre el QR
+        html_path = os.path.join(tmpdir, f"qr_{serial}.html")
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(f"""
+            <html>
+            <head>
+                <title>QR Dispositivo {serial}</title>
+                <script>
+                    // Eliminar archivos temporales cuando se cierre la ventana
+                    window.onunload = async () => {{
+                        try {{
+                            fetch("file://{img_path}", {{ method: "DELETE" }});
+                        }} catch(e) {{}}
+                    }};
+                </script>
+            </head>
+            <body style="text-align:center; margin-top:50px; font-family:Arial">
+                <h2>Dispositivo: {serial}</h2>
+                <img src="file://{img_path}" style="width:300px;height:300px;" />
+                <p>Escanea este QR para reclamar el dispositivo.</p>
+            </body>
+            </html>
+            """)
+
+        print(f"✅ QR generado en: {html_path}")
+        webbrowser.open_new_tab(f"file://{html_path}")
+
+        # Proceso de cleanup automático después de un rato
+        def cleanup():
+            time.sleep(60)  # espera 1 min aprox
+            for path in [img_path, html_path]:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                        print(f"🧹 Archivo eliminado: {path}")
+                except Exception as e:
+                    print(f"⚠️ No se pudo eliminar {path}: {e}")
+
+        threading.Thread(target=cleanup, daemon=True).start()
+
+    # Lanzamos en un hilo aparte para no bloquear
+    threading.Thread(target=worker, daemon=True).start()
+
+iot.txt----------------------------------------
+Iot alchemy+++++++++++++++++++++++++++++++++++
+Estructura de Archivos-----------------------
+    |--cli.py
+    |--config.json
+    |--device.py
+    |--gen_qr.py
+    |--main.py
+    |--manager.py
+    |--templates_loader.py
+    |--utils.py
+    |--scripts/
+        |--modificar.ps1
+        |--reclamar.ps1
+    |--templates/
+        |--camara-seg_auto.json
+        |--luces_auto.json
+        |--persiana_auto.json
+        |--puerta_auto.json
+        |--regador_auto.json
+        |--sensor_co2.json
+        |--sensor_humo.json
+        |--sensor_luz.json
+        |--sensor_mov.json
+        |--sensor_ruido.json
+        |--sensor_smart-plug.json
+        |--sensor_temp.json
+        |--vent_auto.json
+
+Contenido de Archivos-----------------------
+
+cli.py----------------------------------------
+# cli.py
+import time
+from templates_loader import cargar_plantillas
+from manager import DevicesManager
+from gen_qr import generar_qr_reclamo
+from utils import reclamar_dispositivo, modificar_dispositivo, listar_dispositivos_backend
+
+def show_menu():
+    print("\n=== IoT Alchemy CLI ===")
+    print("1) Listar plantillas")
+    print("2) Crear dispositivo desde plantilla")
+    print("3) Listar dispositivos activos")
+    print("4) Iniciar simulación de un dispositivo")
+    print("5) Detener simulación de un dispositivo")
+    print("6) Modificar parámetros de un dispositivo (en vivo-inyeccion de errores)")
+    print("7) Iniciar simulación de todos")
+    print("8) Detener simulación de todos")
+    print("9) Generar QR de dispositivo (Abre Navegador)")
+    print("++++++++++++++ Simulaciones de Front-End ++++++++++++++")
+    print("10) Reclamar dispositivo vía HTTP (PowerShell y cURL)")
+    print("11) Modificar datos vía HTTP (PowerShell y cURL)")
+    print("0) Salir")
+
+def iniciar_cli():
+    templates = cargar_plantillas()
+    manager = DevicesManager()
+
+    while True:
+        show_menu()
+        opt = input("Opción: ").strip()
+        if opt == "1":
+            if not templates:
+                print("No hay plantillas en /templates")
+            else:
+                print("Plantillas:")
+                for name in templates:
+                    print(" -", name)
+
+        elif opt == "2":
+            print("Seleccione plantilla:")
+            keys = list(templates.keys())
+            if not keys:
+                print("No hay plantillas.")
+                continue
+            for i, k in enumerate(keys, 1):
+                print(f"{i}) {k}")
+            sel = input("Número: ").strip()
+            try:
+                idx = int(sel) - 1
+                tpl = templates[keys[idx]]
+            except Exception:
+                print("Selección inválida.")
+                continue
+
+            serial_custom = input("Serial personalizado (ENTER para aleatorio): ").strip() or None
+            cnt = input("¿Cuántos dispositivos crear? (1): ").strip() or "1"
+            try:
+                cnt = int(cnt)
+            except Exception:
+                cnt = 1
+
+            created = manager.create_from_template(tpl, count=cnt, serial_custom=serial_custom)
+            for d in created:
+                print(f"Creado: {d.serial} (intervalo: {d.interval}s)")
+
+        elif opt == "3":
+            devs = manager.list_devices()
+            if not devs:
+                print("No hay dispositivos creados.")
+            else:
+                for d in devs:
+                    print(f"- {d.serial} | apagado:{d.apagado} | intervalo:{d.interval}s | params:{d.parametros}")
+
+        elif opt == "4":
+            s = input("Serial del dispositivo a iniciar: ").strip()
+            d = manager.get(s)
+            if not d:
+                print("No encontrado.")
+            else:
+                d.start()
+                print("Simulación iniciada.")
+
+        elif opt == "5":
+            s = input("Serial del dispositivo a detener: ").strip()
+            d = manager.get(s)
+            if not d:
+                print("No encontrado.")
+            else:
+                d.stop()
+                print("Simulación detenida.")
+
+        elif opt == "6":
+            s = input("Serial del dispositivo: ").strip()
+            d = manager.get(s)
+            if not d:
+                print("No encontrado.")
+            else:
+                print("Parámetros actuales:", d.parametros)
+                key = input("Parámetro a modificar: ").strip()
+                if key not in d.parametros:
+                    print("Parámetro no existe.")
+                else:
+                    val = input("Nuevo valor: ").strip()
+                    if val.lower() in ("true", "false"):
+                        newv = val.lower() == "true"
+                    else:
+                        try:
+                            if "." in val:
+                                newv = float(val)
+                            else:
+                                newv = int(val)
+                        except Exception:
+                            newv = val
+                    d.set_parametro(key, newv)
+                    print("Parámetro actualizado.")
+
+        elif opt == "7":
+            manager.start_all()
+            print("Todas las simulaciones iniciadas.")
+
+        elif opt == "8":
+            manager.stop_all()
+            print("Todas las simulaciones detenidas.")
+
+        elif opt == "9":
+            serial = input("Ingrese el serial del dispositivo: ").strip()
+            generar_qr_reclamo(serial, templates)
+        
+        elif opt == "10":
+            serial = input("Ingrese el serial del dispositivo: ")
+            reclamar_dispositivo(serial, list(templates.values()))
+
+        elif opt == "11":
+            modificar_dispositivo()
+
+        elif opt == "0":
+            print("Saliendo...")
+            manager.stop_all()
+            break
+        else:
+            print("Opción inválida.")
+        time.sleep(0.2)
+config.json----------------------------------------
+{
+  "mqtt_host": "localhost",
+  "mqtt_port": 1883,
+  "mqtt_topic_estado": "dispositivos/estado",
+  "backend_url": "http://localhost:5000",
+  "poll_config_interval": 3
+}
+
+device.py----------------------------------------
+# device.py
+import json
+import os
+import time
+import threading
+import random
+import requests
+import datetime
+from paho.mqtt import publish
+from utils import clamp
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    CONFIG = json.load(f)
+
+# Mapa de equivalencias español -> inglés
+DAY_MAP = {
+    "lunes": "monday",
+    "martes": "tuesday",
+    "miercoles": "wednesday",
+    "miércoles": "wednesday",
+    "jueves": "thursday",
+    "viernes": "friday",
+    "sabado": "saturday",
+    "sábado": "saturday",
+    "domingo": "sunday",
+}
+
+class DeviceSimulator:
+    """
+    Publica SOLO por MQTT:
+      { "serial_number", "estado", "parametros" }
+
+    No envía nada por HTTP. Opcionalmente LEE (GET) del backend
+    para aplicar configuraciones:
+      configuracion.intervalo_envio -> self.interval
+      configuracion.encendido (True/False) -> self.apagado
+      configuracion.modo ("manual"/"horario") -> define comportamiento
+    """
+
+    def __init__(
+        self,
+        serial,
+        parametros_rules,
+        mqtt_topic=None,
+        interval=5,
+        mqtt_host=None,
+        backend_url=None,
+        poll_config_interval=None
+    ):
+        self.serial = serial
+        self.param_rules = parametros_rules or {}
+        self.mqtt_topic = mqtt_topic or CONFIG.get("mqtt_topic_estado", "dispositivos/estado")
+        self.mqtt_host = mqtt_host or CONFIG.get("mqtt_host", "localhost")
+        self.backend_url = backend_url or CONFIG.get("backend_url")
+        self.interval = max(1, int(interval))
+
+        # Flags e hilos
+        self.running = False
+        self._thread = None
+        self._cfg_thread = None
+
+        # Estado/params
+        self.apagado = False  # apagado=True -> estado="inactivo"
+        self.parametros = {}
+        for k, rule in self.param_rules.items():
+            mn = rule.get("min", 0)
+            mx = rule.get("max", 1)
+            t = rule.get("tipo")
+            if t in ("float", "double"):
+                self.parametros[k] = round(random.uniform(mn, mx), 2)
+            elif t == "int":
+                self.parametros[k] = random.randint(int(mn), int(mx))
+            elif t == "boolean":
+                self.parametros[k] = random.choice([True, False])
+            else:
+                self.parametros[k] = rule.get("default")
+
+        # Config remota (solo lectura)
+        self.poll_config_interval = max(1, int(poll_config_interval or CONFIG.get("poll_config_interval", 3)))
+        self._device_id = None  # cache para GET /dispositivos/<id>
+        self.inyecciones = {k: False for k in self.param_rules}
+
+        # Último encendido sincronizado al backend
+        self._last_encendido_sync = None
+
+    # ----------- Simulación -----------
+    def _step(self):
+        for k, rule in self.param_rules.items():
+            if self.inyecciones.get(k, False):
+                continue
+
+            t = rule.get("tipo")
+            if t in ("float", "double"):
+                var = rule.get("variacion", (rule.get("max", 1) - rule.get("min", 0)) * 0.05)
+                cur = float(self.parametros.get(k, 0))
+                nuevo = clamp(cur + random.uniform(-var, var), rule.get("min", cur), rule.get("max", cur))
+                self.parametros[k] = round(nuevo, 3)
+            elif t == "int":
+                var = rule.get("variacion", 1)
+                cur = int(self.parametros.get(k, 0))
+                nuevo = int(clamp(cur + random.randint(-var, var), rule.get("min", cur), rule.get("max", cur)))
+                self.parametros[k] = nuevo
+            elif t == "boolean":
+                prob = rule.get("prob_flip", 0.01)
+                if random.random() < prob:
+                    self.parametros[k] = not bool(self.parametros.get(k, False))
+
+    def _estado_str(self):
+        return "inactivo" if self.apagado else "activo"
+
+    def build_mqtt_payload(self):
+        return {
+            "serial_number": self.serial,
+            "estado": self._estado_str(),
+            "parametros": self.parametros
+        }
+
+    def publish_estado(self):
+        payload = self.build_mqtt_payload()
+        try:
+            publish.single(self.mqtt_topic, json.dumps(payload), hostname=self.mqtt_host)
+        except Exception as e:
+            print("[MQTT ERROR]", e)
+
+    def _run(self):
+        while self.running:
+            if not self.apagado:
+                self._step()
+                self.publish_estado()
+            else:
+                self.publish_estado()
+            time.sleep(self.interval)
+
+    # ----------- Config remota (solo lectura HTTP GET) -----------
+    def _ensure_device_id(self):
+        if not self.backend_url or self._device_id is not None:
+            return
+        try:
+            r = requests.get(f"{self.backend_url}/dispositivos", timeout=5)
+            if r.status_code == 200:
+                lista = r.json()
+                match = next((d for d in lista if d.get("serial_number") == self.serial), None)
+                if match:
+                    self._device_id = match["id"]
+        except Exception as e:
+            print(f"[CFG] Error buscando ID para {self.serial}: {e}")
+
+    def _sync_encendido_to_backend(self, cfg):
+        """Sincroniza encendido al backend solo si cambió."""
+        if not (self.backend_url and self._device_id is not None):
+            return
+        new_val = bool(cfg.get("encendido"))
+        if self._last_encendido_sync is not None and self._last_encendido_sync == new_val:
+            return  # no hay cambios
+        try:
+            resp = requests.put(
+                f"{self.backend_url}/dispositivos/{self._device_id}",
+                json={"configuracion": cfg, "encendido": new_val},
+                timeout=5
+            )
+            if resp.status_code in (200, 204):
+                self._last_encendido_sync = new_val
+        except Exception as e:
+            print(f"[CFG] Error sincronizando estado con backend: {e}")
+
+    def _aplicar_config(self, cfg):
+        # Si no hay modo → dispositivo no reclamado todavía
+        modo = cfg.get("modo")
+        if not modo:
+            print(f"[CFG] {self.serial} aún no reclamado, ignorando configuración")
+            return
+
+        if modo == "manual":
+            # En manual: encendido manda, estado escucha
+            encendido = cfg.get("encendido", True)
+            self.apagado = not bool(encendido)
+
+        elif modo == "horario":
+            # En horario: estado manda, encendido escucha
+            ahora = datetime.datetime.now()
+            dia_actual = ahora.strftime("%A").lower()
+
+            activo = False
+            for h in cfg.get("horarios", []):
+                dias_cfg = [d.lower() for d in h.get("dias", ["todos"])]
+                dias_norm = []
+                for d in dias_cfg:
+                    if d in DAY_MAP:
+                        dias_norm.append(DAY_MAP[d])
+                    else:
+                        dias_norm.append(d)
+
+                if "todos" in dias_norm or "all" in dias_norm or dia_actual in dias_norm:
+                    try:
+                        start_str = h.get("inicio") or h.get("start")
+                        end_str   = h.get("fin")    or h.get("end")
+                        if not (start_str and end_str):
+                            continue
+                        ini = datetime.datetime.strptime(start_str, "%H:%M").time()
+                        fin = datetime.datetime.strptime(end_str, "%H:%M").time()
+
+                        if ini < fin:
+                            if ini <= ahora.time() <= fin:
+                                activo = True
+                        else:  # cruza medianoche
+                            if ahora.time() >= ini or ahora.time() <= fin:
+                                activo = True
+                    except Exception as e:
+                        print(f"[CFG] Horario inválido: {h} ({e})")
+
+            # Estado manda
+            self.apagado = not activo
+            cfg["encendido"] = activo
+            self._sync_encendido_to_backend(cfg)
+
+        # Intervalo de envío
+        intervalo = cfg.get("intervalo_envio")
+        if isinstance(intervalo, (int, float)) and intervalo > 0:
+            self.interval = int(intervalo)
+
+    def _poll_remote_config(self):
+        while self.running and self.backend_url:
+            try:
+                self._ensure_device_id()
+                if self._device_id is not None:
+                    r = requests.get(f"{self.backend_url}/dispositivos/{self._device_id}", timeout=5)
+                    if r.status_code == 200:
+                        data = r.json()
+                        cfg = data.get("configuracion") or {}
+                        self._aplicar_config(cfg)
+            except Exception as e:
+                print(f"[CFG] Error leyendo configuración remota: {e}")
+            time.sleep(self.poll_config_interval)
+
+    # ----------- API pública -----------
+    def start(self):
+        if self.running:
+            return
+        self.running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        if self.backend_url:
+            self._cfg_thread = threading.Thread(target=self._poll_remote_config, daemon=True)
+            self._cfg_thread.start()
+
+    def stop(self):
+        self.running = False
+        if self._thread:
+            self._thread.join(timeout=1)
+
+    def set_parametro(self, key, value):
+        if key in self.parametros:
+            mn = self.param_rules[key].get("min", float("-inf"))
+            mx = self.param_rules[key].get("max", float("inf"))
+            if isinstance(value, (int, float)) and (value < mn or value > mx):
+                self.inyecciones[key] = True
+            else:
+                self.inyecciones[key] = False
+            self.parametros[key] = value
+            return True
+        return False
+
+    def set_parametros_bulk(self, new_params: dict):
+        for k, v in new_params.items():
+            if k in self.parametros:
+                self.parametros[k] = v
+
+    def apagar(self):
+        self.apagado = True
+
+    def encender(self):
+        self.apagado = False
+
+gen_qr.py----------------------------------------
+# gen_qr.py
+import qrcode
+import json
+import webbrowser
+import os
+import tempfile
+import threading
+import time
+
+def generar_qr_reclamo(serial, templates_dict):
+    def worker():
+        prefix = serial[:4]  # usamos sufijo de 4 caracteres
+        template = next(
+            (tpl for tpl in templates_dict.values() if tpl.get("serial_prefix") == prefix),
+            None
+        )
+
+        if not template:
+            print(f"No se encontró template para prefijo {prefix}")
+            return
+
+        # Datos mínimos para el reclamo
+        data = {
+            "serial_number": serial,
+            "nombre": template.get("nombre", ""),
+            "tipo": template.get("tipo", ""),
+            "modelo": template.get("modelo", ""),
+            "descripcion": template.get("descripcion", ""),
+            "configuracion": template.get("configuracion", {})
+        }
+
+        # Crear QR en archivo temporal
+        tmpdir = tempfile.gettempdir()
+        img_path = os.path.join(tmpdir, f"qr_{serial}.png")
+        qr = qrcode.make(json.dumps(data, ensure_ascii=False))
+        qr.save(img_path)
+
+        # Crear un HTML temporal que muestre el QR
+        html_path = os.path.join(tmpdir, f"qr_{serial}.html")
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(f"""
+            <html>
+            <head>
+                <title>QR Dispositivo {serial}</title>
+                <script>
+                    // Eliminar archivos temporales cuando se cierre la ventana
+                    window.onunload = async () => {{
+                        try {{
+                            fetch("file://{img_path}", {{ method: "DELETE" }});
+                        }} catch(e) {{}}
+                    }};
+                </script>
+            </head>
+            <body style="text-align:center; margin-top:50px; font-family:Arial">
+                <h2>Dispositivo: {serial}</h2>
+                <img src="file://{img_path}" style="width:300px;height:300px;" />
+                <p>Escanea este QR para reclamar el dispositivo.</p>
+            </body>
+            </html>
+            """)
+
+        print(f"✅ QR generado en: {html_path}")
+        webbrowser.open_new_tab(f"file://{html_path}")
+
+        # Proceso de cleanup automático después de un rato
+        def cleanup():
+            time.sleep(60)  # espera 1 min aprox
+            for path in [img_path, html_path]:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                        print(f"🧹 Archivo eliminado: {path}")
+                except Exception as e:
+                    print(f"⚠️ No se pudo eliminar {path}: {e}")
+
+        threading.Thread(target=cleanup, daemon=True).start()
+
+    # Lanzamos en un hilo aparte para no bloquear
+    threading.Thread(target=worker, daemon=True).start()
+
+main.py----------------------------------------
+# main.py
+from cli import iniciar_cli
+
+if __name__ == "__main__":
+    iniciar_cli()
+manager.py----------------------------------------
+import os
+import json
+from device import DeviceSimulator
+from utils import generar_serial
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar config.json: {e}")
+        return {}
+    
+
+class DevicesManager:
+    def __init__(self):
+        self.devices = {}  # serial -> DeviceSimulator
+        self.config = load_config()
+
+    def create_from_template(self, template, count=1, serial_custom=None):
+        """
+        Crea uno o varios dispositivos desde una plantilla.
+        - Si serial_custom viene, solo crea 1 con ese serial exacto.
+        - Si no, genera 'count' dispositivos con serial aleatorio.
+        """
+        created = []
+        if serial_custom:
+            seriales = [serial_custom]
+        else:
+            seriales = [generar_serial(template.get("serial_prefix", "DEV")) for _ in range(count)]
+
+        for serial in seriales:
+            params_rules = template.get("parametros", {}) or {}
+            interval = int(template.get("configuracion", {}).get("intervalo_envio", 5))
+
+            d = DeviceSimulator(
+                serial=serial,
+                parametros_rules=params_rules,
+                mqtt_topic=self.config.get("mqtt_topic_estado", "dispositivos/estado"),
+                interval=interval,
+                mqtt_host=self.config.get("mqtt_host", "localhost"),
+                backend_url=self.config.get("backend_url"),
+                poll_config_interval=self.config.get("poll_config_interval", 3)
+            )
+            self.devices[serial] = d
+            created.append(d)
+        return created
+
+    def list_devices(self):
+        return list(self.devices.values())
+
+    def get(self, serial):
+        return self.devices.get(serial)
+
+    def remove(self, serial):
+        d = self.devices.pop(serial, None)
+        if d:
+            d.stop()
+            return True
+        return False
+
+    def start_all(self):
+        for d in self.devices.values():
+            d.start()
+
+    def stop_all(self):
+        for d in self.devices.values():
+            d.stop()
+
+templates_loader.py----------------------------------------
+# templates_loader.py
+import os
+import json
+
+TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+
+def cargar_plantillas():
+    plantillas = {}
+    if not os.path.isdir(TEMPLATE_DIR):
+        return plantillas
+    for archivo in os.listdir(TEMPLATE_DIR):
+        if archivo.endswith(".json"):
+            nombre = archivo.replace(".json", "")
+            ruta = os.path.join(TEMPLATE_DIR, archivo)
+            with open(ruta, "r", encoding="utf-8") as f:
+                plantillas[nombre] = json.load(f)
+    return plantillas
+
+utils.py----------------------------------------
+# utils.py
+import random
+import string
+import subprocess
+import json
+import os
+import requests
+
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+## Cargar Config
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar config.json: {e}")
+        return {}
+
+def get_backend_url(path=""):
+    config = load_config()
+    base_url = config.get("backend_url", "http://localhost:5000").rstrip("/")
+    if path:
+        return f"{base_url}/{path.lstrip('/')}"
+    return base_url
+
+## Genera serial 
+def generar_serial(prefix="DEV", length=8):
+    rand_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    return f"{prefix}{rand_part}"
+
+def clamp(v, mn, mx):
+    return max(mn, min(mx, v))
+
+def listar_dispositivos_backend():
+    try:
+        resp = requests.get(get_backend_url("dispositivos"))
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            print(f"❌ Error al listar dispositivos: {resp.status_code}")
+            return []
+    except Exception as e:
+        print(f"❌ No se pudo conectar al backend: {e}")
+        return []
+
+#Utilizado opcion 10
+def reclamar_dispositivo(serial, templates):
+    prefix = serial[:4]
+    template = next((t for t in templates if t.get("serial_prefix") == prefix), None)
+
+    if not template:
+        print(f"❌ No se encontró template para prefijo {prefix}")
+        return
+
+    # Construcción del payload
+    payload = {
+        "serial_number": serial,
+        "nombre": template.get("nombre", ""),
+        "tipo": template.get("tipo", ""),
+        "modelo": template.get("modelo", ""),
+        "descripcion": template.get("descripcion", ""),
+        "configuracion": template.get("configuracion", {})
+    }
+
+    # Pasar parametros al script de PowerShell
+    subprocess.run([
+        "powershell", "-ExecutionPolicy", "Bypass", "-File", "scripts/reclamar.ps1",
+        "-serial_number", payload["serial_number"],
+        "-nombre", payload["nombre"],
+        "-tipo", payload["tipo"],
+        "-modelo", payload["modelo"],
+        "-descripcion", payload["descripcion"],
+        "-configuracion", json.dumps(payload["configuracion"])
+    ])
+
+# Utilizado opcion 11
+def modificar_dispositivo():
+    serial = input("Ingrese el serial del dispositivo a modificar: ").strip()
+    dispositivos = listar_dispositivos_backend()
+
+    if not dispositivos:
+        print("❌ No hay dispositivos en el backend o no se pudo conectar.")
+        return
+
+    dispositivo = next((d for d in dispositivos if d.get("serial_number") == serial), None)
+    if not dispositivo:
+        print(f"❌ No se encontró un dispositivo con serial {serial}")
+        return
+
+    print(f"✅ Dispositivo encontrado: {dispositivo.get('nombre', 'Sin nombre')} ({serial})")
+
+    # Opciones editables
+    opciones = {
+        "1": "nombre",
+        "2": "tipo",
+        "3": "modelo",
+        "4": "descripcion",
+        "5": "configuracion"
+    }
+
+    print("¿Qué desea modificar?")
+    for k, v in opciones.items():
+        print(f"{k}) {v}")
+
+    choice = input("Opción: ").strip()
+    if choice not in opciones:
+        print("❌ Opción inválida")
+        return
+
+    campo = opciones[choice]
+
+    # ---- Caso especial para configuración ----
+    if campo == "configuracion":
+        print("Ingrese el JSON parcial con los cambios (ej: {\"modo\": \"horario\"}):")
+        raw_valor = input("> ").strip()
+        try:
+            nuevo_valor = json.loads(raw_valor)
+            if not isinstance(nuevo_valor, dict):
+                print("❌ La configuración debe ser un objeto JSON (ej: {\"encendido\": true})")
+                return
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON inválido: {e}")
+            return
+
+        # Tomar la configuración actual como base
+        config_actual = dispositivo.get("configuracion", {}).copy()
+        config_actual.update(nuevo_valor)
+
+        # Normalización de modo
+        modo = config_actual.get("modo")
+        if modo == "horario" and "encendido" in config_actual:
+            # Si es horario → eliminamos encendido
+            del config_actual["encendido"]
+            print(" ✅Cambiado 'modo': 'horario';  ❌Eliminado 'encendido'")
+        elif modo == "manual" and "horarios" in config_actual:
+            # Si es manual → eliminamos horarios
+            del config_actual["horarios"]
+            print(" ✅Cambiado 'modo': 'Manual' ❌Eliminado 'horarios'")
+
+        payload = {"configuracion": config_actual}
+
+    else:
+        # Para nombre, tipo, modelo o descripcion
+        nuevo_valor = input(f"Ingrese el nuevo valor para {campo}: ").strip()
+        if not nuevo_valor:
+            print("❌ El valor no puede estar vacío.")
+            return
+        payload = {campo: nuevo_valor}
+
+    print("📤 Enviando actualización al backend...")
+
+    try:
+        subprocess.run([
+            "powershell",
+            "-ExecutionPolicy", "Bypass",
+            "-File", os.path.join(SCRIPTS_DIR, "modificar.ps1"),
+            "-id", str(dispositivo["id"]),
+            "-payload", json.dumps(payload)
+        ])
+    except Exception as e:
+        print(f"❌ Error al ejecutar script PowerShell: {e}")
+
+scripts\modificar.ps1----------------------------------------
+﻿param(
+    [string]$id,
+    [string]$payload
+)
+
+# Cargar config.json
+$configPath = Join-Path $PSScriptRoot "..\config.json"
+$config = Get-Content $configPath | ConvertFrom-Json
+$backendUrl = $config.backend_url.TrimEnd('/')
+
+$url = "$backendUrl/dispositivos/$id/estado"
+
+Write-Host "🔧 Modificando dispositivo con ID: $id"
+Write-Host "🌍 Usando backend: $backendUrl"
+
+try {
+    $response = Invoke-RestMethod -Uri $url `
+                                  -Method Put `
+                                  -Body $payload `
+                                  -ContentType "application/json; charset=utf-8"
+
+    Write-Host "📡 Respuesta del servidor:"
+    $response | ConvertTo-Json -Depth 5
+}
+catch {
+    Write-Host "❌ Error al modificar dispositivo: $_"
+}
+
+scripts\reclamar.ps1----------------------------------------
+﻿param(
+    [string]$serial_number,
+    [string]$nombre,
+    [string]$tipo,
+    [string]$modelo,
+    [string]$descripcion,
+    [string]$configuracion
+)
+
+# Cargar config.json
+$configPath = Join-Path $PSScriptRoot "..\config.json"
+$config = Get-Content $configPath | ConvertFrom-Json
+$backendUrl = $config.backend_url.TrimEnd('/')
+
+# Construir el body como hashtable
+$body = @{
+    serial_number = $serial_number
+    nombre        = $nombre
+    tipo          = $tipo
+    modelo        = $modelo
+    descripcion   = $descripcion
+    configuracion = (ConvertFrom-Json $configuracion)
+}
+
+# Convertir a JSON
+$json = $body | ConvertTo-Json -Depth 5 -Compress
+
+Write-Host "📤 Enviando payload al backend..."
+Write-Host $json
+Write-Host "🌍 Usando backend: $backendUrl"
+
+# Ejecutar POST
+try {
+    $response = Invoke-RestMethod -Uri "$backendUrl/dispositivos/reclamar" `
+                                  -Method POST `
+                                  -Body $json `
+                                  -ContentType 'application/json; charset=utf-8'
+
+    Write-Host "✅ Respuesta del backend:"
+    $response | ConvertTo-Json -Depth 5
+}
+catch {
+    Write-Host "❌ Error al enviar request: $_"
+}
+
+templates\camara-seg_auto.json----------------------------------------
+{
+  "serial_prefix": "CAM0",
+  "nombre": "Cámara de Seguridad",
+  "tipo": "actuador",
+  "modelo": "CAM-900",
+  "descripcion": "Cámara IP con transmisión de video y detección de movimiento",
+  "configuracion": {
+    "intervalo_envio": 15,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      {"dias": ["sabado","domingo"], "inicio": "00:00", "fin": "23:59"},
+      {"dias": ["lunes","martes","miercoles","jueves","viernes"], "inicio": "20:00", "fin": "07:00"}
+]
+
+  },
+  "parametros": {
+    "stream_activo": {
+      "tipo": "boolean",
+      "prob_flip": 0.90
+    },
+    "alertas_movimiento": {
+      "tipo": "boolean",
+      "prob_flip": 0.1
+    }
+  }
+}
+
+templates\luces_auto.json----------------------------------------
+{
+  "serial_prefix": "LGT0",
+  "nombre": "Luces Automáticas",
+  "tipo": "actuador",
+  "modelo": "LGT-300",
+  "descripcion": "Sistema de iluminación con encendido y apagado automático",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      { "dias": ["todos"], "inicio": "18:00", "fin": "06:00" }
+    ]
+  },
+  "parametros": {}
+}
+
+templates\persiana_auto.json----------------------------------------
+{
+  "serial_prefix": "SHD0",
+  "nombre": "Persiana Inteligente",
+  "tipo": "actuador",
+  "modelo": "SHD-400",
+  "descripcion": "Control de apertura y cierre de persianas",
+  "configuracion": {
+    "intervalo_envio": 8,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+  }
+}
+
+templates\puerta_auto.json----------------------------------------
+{
+  "serial_prefix": "DRL0",
+  "nombre": "Puerta Inteligente",
+  "tipo": "actuador",
+  "modelo": "DR-200",
+  "descripcion": "Puerta con cerradura inteligente y control remoto",
+  "configuracion": {
+    "intervalo_envio": 12,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+
+  }
+}
+
+templates\regador_auto.json----------------------------------------
+{
+  "serial_prefix": "RGD0",
+  "nombre": "Regador Automático",
+  "tipo": "actuador",
+  "modelo": "RG-500",
+  "descripcion": "Sistema automático de riego programado",
+  "configuracion": {
+    "intervalo_envio": 20,
+    "encendido": false,
+    "modo": "manual",
+    "horarios": [
+      { "dias": ["lunes","miercoles","viernes"], "inicio": "06:00", "fin": "06:15" }
+    ]
+  },
+  "parametros": {}
+}
+
+templates\sensor_co2.json----------------------------------------
+{
+  "serial_prefix": "CO20",
+  "nombre": "Sensor de CO₂",
+  "tipo": "sensor",
+  "modelo": "C2-300",
+  "descripcion": "Medidor de concentración de dióxido de carbono en ppm",
+  "configuracion": {
+    "intervalo_envio": 12,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "co2_ppm": {
+      "tipo": "int",
+      "min": 0,
+      "max": 800,
+      "variacion": 50
+    }
+  }
+}
+
+templates\sensor_humo.json----------------------------------------
+{
+  "serial_prefix": "SMK0",
+  "nombre": "Detector de Humo",
+  "tipo": "sensor",
+  "modelo": "SM-150",
+  "descripcion": "Alarma contra incendios",
+  "configuracion": {
+    "intervalo_envio": 20,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+    "humo_detectado": {
+      "tipo": "boolean",
+      "prob_flip": 0.002
+    }
+  }
+}
+
+templates\sensor_luz.json----------------------------------------
+{
+  "serial_prefix": "LUX0",
+  "nombre": "Sensor de Luz",
+  "tipo": "sensor",
+  "modelo": "LX-500",
+  "descripcion": "Sensor de intensidad luminosa en lux",
+  "configuracion": {
+    "intervalo_envio": 8,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "luz_lux": {
+      "tipo": "float",
+      "min": 0.0,
+      "max": 500.0,
+      "variacion": 20.0
+    }
+  }
+}
+
+templates\sensor_mov.json----------------------------------------
+{
+  "serial_prefix": "MOV0",
+  "nombre": "Sensor de Movimiento",
+  "tipo": "sensor",
+  "modelo": "MOV-200",
+  "descripcion": "Sensor binario de movimiento",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+    {"dias": ["todos"], "inicio": "21:25", "fin": "21:30"}
+  ]
+  },
+  "parametros": {
+    "movimiento": {
+      "tipo": "boolean",
+      "prob_flip": 0.01
+    }
+  }
+}
+
+templates\sensor_ruido.json----------------------------------------
+{
+  "serial_prefix": "SND0",
+  "nombre": "Sensor de Ruido",
+  "tipo": "sensor",
+  "modelo": "SN-200",
+  "descripcion": "Medidor de niveles sonoros en decibeles",
+  "configuracion": {
+    "intervalo_envio": 7,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "db": {
+      "tipo": "float",
+      "min": 30.0,
+      "max": 80.0,
+      "variacion": 5.0
+    }
+  }
+}
+
+templates\sensor_smart-plug.json----------------------------------------
+{
+  "serial_prefix": "PLG0",
+  "nombre": "Smart Plug",
+  "tipo": "actuador",
+  "modelo": "SP-100",
+  "descripcion": "Medidor de consumo electrico",
+  "configuracion": {
+    "intervalo_envio": 6,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "consumo_w": {
+      "tipo": "float",
+      "min": 0.0,
+      "max": 2000.0,
+      "variacion": 50.0
+    }
+  }
+}
+
+templates\sensor_temp.json----------------------------------------
+{
+  "serial_prefix": "TMP0",
+  "nombre": "Sensor de Temperatura Generico",
+  "tipo": "sensor",
+  "modelo": "ST-1000",
+  "descripcion": "Sensor de temperatura",
+  "configuracion": {
+    "intervalo_envio": 5,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "temperatura": {
+      "tipo": "float",
+      "min": 20.0,
+      "max": 30.0,
+      "variacion": 0.3
+    },
+    "humedad": {
+      "tipo": "int",
+      "min": 35,
+      "max": 65,
+      "variacion": 2
+    }
+  }
+}
+
+templates\vent_auto.json----------------------------------------
+{
+  "serial_prefix": "FAN0",
+  "nombre": "Ventilador Inteligente",
+  "tipo": "actuador",
+  "modelo": "FAN-300",
+  "descripcion": "Ventilador con control de velocidad inteligente",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": false,
+    "modo": "manual"
+  },
+  "parametros": {
+    "velocidad": {
+      "tipo": "int",
+      "min": 0,
+      "max": 3,
+      "variacion": 1
+    }
+  }
+}
+
+
+main.py----------------------------------------
+# main.py
+from cli import iniciar_cli
+
+if __name__ == "__main__":
+    iniciar_cli()
+manager.py----------------------------------------
+import os
+import json
+from device import DeviceSimulator
+from utils import generar_serial
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar config.json: {e}")
+        return {}
+    
+
+class DevicesManager:
+    def __init__(self):
+        self.devices = {}  # serial -> DeviceSimulator
+        self.config = load_config()
+
+    def create_from_template(self, template, count=1, serial_custom=None):
+        """
+        Crea uno o varios dispositivos desde una plantilla.
+        - Si serial_custom viene, solo crea 1 con ese serial exacto.
+        - Si no, genera 'count' dispositivos con serial aleatorio.
+        """
+        created = []
+        if serial_custom:
+            seriales = [serial_custom]
+        else:
+            seriales = [generar_serial(template.get("serial_prefix", "DEV")) for _ in range(count)]
+
+        for serial in seriales:
+            params_rules = template.get("parametros", {}) or {}
+            interval = int(template.get("configuracion", {}).get("intervalo_envio", 5))
+
+            d = DeviceSimulator(
+                serial=serial,
+                parametros_rules=params_rules,
+                mqtt_topic=self.config.get("mqtt_topic_estado", "dispositivos/estado"),
+                interval=interval,
+                mqtt_host=self.config.get("mqtt_host", "localhost"),
+                backend_url=self.config.get("backend_url"),
+                poll_config_interval=self.config.get("poll_config_interval", 3)
+            )
+            self.devices[serial] = d
+            created.append(d)
+        return created
+
+    def list_devices(self):
+        return list(self.devices.values())
+
+    def get(self, serial):
+        return self.devices.get(serial)
+
+    def remove(self, serial):
+        d = self.devices.pop(serial, None)
+        if d:
+            d.stop()
+            return True
+        return False
+
+    def start_all(self):
+        for d in self.devices.values():
+            d.start()
+
+    def stop_all(self):
+        for d in self.devices.values():
+            d.stop()
+
+templates_loader.py----------------------------------------
+# templates_loader.py
+import os
+import json
+
+TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+
+def cargar_plantillas():
+    plantillas = {}
+    if not os.path.isdir(TEMPLATE_DIR):
+        return plantillas
+    for archivo in os.listdir(TEMPLATE_DIR):
+        if archivo.endswith(".json"):
+            nombre = archivo.replace(".json", "")
+            ruta = os.path.join(TEMPLATE_DIR, archivo)
+            with open(ruta, "r", encoding="utf-8") as f:
+                plantillas[nombre] = json.load(f)
+    return plantillas
+
+utils.py----------------------------------------
+# utils.py
+import random
+import string
+import subprocess
+import json
+import os
+import requests
+
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+## Cargar Config
+def load_config():
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar config.json: {e}")
+        return {}
+
+def get_backend_url(path=""):
+    config = load_config()
+    base_url = config.get("backend_url", "http://localhost:5000").rstrip("/")
+    if path:
+        return f"{base_url}/{path.lstrip('/')}"
+    return base_url
+
+## Genera serial 
+def generar_serial(prefix="DEV", length=8):
+    rand_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    return f"{prefix}{rand_part}"
+
+def clamp(v, mn, mx):
+    return max(mn, min(mx, v))
+
+def listar_dispositivos_backend():
+    try:
+        resp = requests.get(get_backend_url("dispositivos"))
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            print(f"❌ Error al listar dispositivos: {resp.status_code}")
+            return []
+    except Exception as e:
+        print(f"❌ No se pudo conectar al backend: {e}")
+        return []
+
+#Utilizado opcion 10
+def reclamar_dispositivo(serial, templates):
+    prefix = serial[:4]
+    template = next((t for t in templates if t.get("serial_prefix") == prefix), None)
+
+    if not template:
+        print(f"❌ No se encontró template para prefijo {prefix}")
+        return
+
+    # Construcción del payload
+    payload = {
+        "serial_number": serial,
+        "nombre": template.get("nombre", ""),
+        "tipo": template.get("tipo", ""),
+        "modelo": template.get("modelo", ""),
+        "descripcion": template.get("descripcion", ""),
+        "configuracion": template.get("configuracion", {})
+    }
+
+    # Pasar parametros al script de PowerShell
+    subprocess.run([
+        "powershell", "-ExecutionPolicy", "Bypass", "-File", "scripts/reclamar.ps1",
+        "-serial_number", payload["serial_number"],
+        "-nombre", payload["nombre"],
+        "-tipo", payload["tipo"],
+        "-modelo", payload["modelo"],
+        "-descripcion", payload["descripcion"],
+        "-configuracion", json.dumps(payload["configuracion"])
+    ])
+
+# Utilizado opcion 11
+def modificar_dispositivo():
+    serial = input("Ingrese el serial del dispositivo a modificar: ").strip()
+    dispositivos = listar_dispositivos_backend()
+
+    if not dispositivos:
+        print("❌ No hay dispositivos en el backend o no se pudo conectar.")
+        return
+
+    dispositivo = next((d for d in dispositivos if d.get("serial_number") == serial), None)
+    if not dispositivo:
+        print(f"❌ No se encontró un dispositivo con serial {serial}")
+        return
+
+    print(f"✅ Dispositivo encontrado: {dispositivo.get('nombre', 'Sin nombre')} ({serial})")
+
+    # Opciones editables
+    opciones = {
+        "1": "nombre",
+        "2": "tipo",
+        "3": "modelo",
+        "4": "descripcion",
+        "5": "configuracion"
+    }
+
+    print("¿Qué desea modificar?")
+    for k, v in opciones.items():
+        print(f"{k}) {v}")
+
+    choice = input("Opción: ").strip()
+    if choice not in opciones:
+        print("❌ Opción inválida")
+        return
+
+    campo = opciones[choice]
+
+    # ---- Caso especial para configuración ----
+    if campo == "configuracion":
+        print("Ingrese el JSON parcial con los cambios (ej: {\"modo\": \"horario\"}):")
+        raw_valor = input("> ").strip()
+        try:
+            nuevo_valor = json.loads(raw_valor)
+            if not isinstance(nuevo_valor, dict):
+                print("❌ La configuración debe ser un objeto JSON (ej: {\"encendido\": true})")
+                return
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON inválido: {e}")
+            return
+
+        # Tomar la configuración actual como base
+        config_actual = dispositivo.get("configuracion", {}).copy()
+        config_actual.update(nuevo_valor)
+
+        # Normalización de modo
+        modo = config_actual.get("modo")
+        if modo == "horario" and "encendido" in config_actual:
+            print(" ✅Cambiado 'modo': 'horario'")
+        elif modo == "manual" and "horarios" in config_actual:
+            print(" ✅Cambiado 'modo': 'Manual'")
+
+        payload = {"configuracion": config_actual}
+
+    else:
+        # Para nombre, tipo, modelo o descripcion
+        nuevo_valor = input(f"Ingrese el nuevo valor para {campo}: ").strip()
+        if not nuevo_valor:
+            print("❌ El valor no puede estar vacío.")
+            return
+        payload = {campo: nuevo_valor}
+
+    # ... después de construir 'payload' (dict) ...
+    # ... tras construir 'payload' (dict) ...
+    print("📤 Enviando actualización al backend...")
+
+    try:
+        subprocess.run([
+            "powershell",
+            "-ExecutionPolicy", "Bypass",
+            "-File", os.path.join(SCRIPTS_DIR, "modificar.ps1"),
+            "-id", str(dispositivo["id"]),
+            "-payload", json.dumps(payload)
+        ])
+    except Exception as e:
+        print(f"❌ Error al ejecutar script PowerShell: {e}")
+
+
+
+scripts\modificar.ps1----------------------------------------
+﻿param(
+    [Parameter(Mandatory=$true)][string]$id,
+    [Parameter(Mandatory=$true)][string]$payload
+)
+
+# Cargar config.json (igual que reclamar.ps1)
+$scriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
+$configPath = Join-Path $scriptDir "..\config.json"
+$config     = Get-Content $configPath | ConvertFrom-Json
+$backendUrl = $config.backend_url.TrimEnd('/')
+
+# Endpoint único (parciales / mode-aware)
+$url = "$backendUrl/dispositivos/$id"
+
+Write-Host "🔧 Modificando dispositivo con ID: $id"
+Write-Host "🌍 Endpoint: $url"
+Write-Host "📤 Payload:"
+Write-Host $payload
+
+try {
+    $response = Invoke-RestMethod -Uri $url `
+                                  -Method Put `
+                                  -Body $payload `
+                                  -ContentType "application/json; charset=utf-8"
+    Write-Host "✅ Respuesta del servidor:"
+    $response | ConvertTo-Json -Depth 10
+}
+catch {
+    Write-Host "❌ Error al modificar dispositivo: $_"
+}
+
+scripts\reclamar.ps1----------------------------------------
+﻿param(
+    [string]$serial_number,
+    [string]$nombre,
+    [string]$tipo,
+    [string]$modelo,
+    [string]$descripcion,
+    [string]$configuracion
+)
+
+# Cargar config.json
+$configPath = Join-Path $PSScriptRoot "..\config.json"
+$config = Get-Content $configPath | ConvertFrom-Json
+$backendUrl = $config.backend_url.TrimEnd('/')
+
+# Construir el body como hashtable
+$body = @{
+    serial_number = $serial_number
+    nombre        = $nombre
+    tipo          = $tipo
+    modelo        = $modelo
+    descripcion   = $descripcion
+    configuracion = (ConvertFrom-Json $configuracion)
+}
+
+# Convertir a JSON
+$json = $body | ConvertTo-Json -Depth 5 -Compress
+
+Write-Host "📤 Enviando payload al backend..."
+Write-Host $json
+Write-Host "🌍 Usando backend: $backendUrl"
+
+# Ejecutar POST
+try {
+    $response = Invoke-RestMethod -Uri "$backendUrl/dispositivos/reclamar" `
+                                  -Method POST `
+                                  -Body $json `
+                                  -ContentType 'application/json; charset=utf-8'
+
+    Write-Host "✅ Respuesta del backend:"
+    $response | ConvertTo-Json -Depth 5
+}
+catch {
+    Write-Host "❌ Error al enviar request: $_"
+}
+
+templates\camara-seg_auto.json----------------------------------------
+{
+  "serial_prefix": "CAM0",
+  "nombre": "Cámara de Seguridad",
+  "tipo": "actuador",
+  "modelo": "CAM-900",
+  "descripcion": "Cámara IP con transmisión de video y detección de movimiento",
+  "configuracion": {
+    "intervalo_envio": 15,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      {"dias": ["sabado","domingo"], "inicio": "00:00", "fin": "23:59"},
+      {"dias": ["lunes","martes","miercoles","jueves","viernes"], "inicio": "20:00", "fin": "07:00"}
+]
+
+  },
+  "parametros": {
+    "stream_activo": {
+      "tipo": "boolean",
+      "prob_flip": 0.90
+    },
+    "alertas_movimiento": {
+      "tipo": "boolean",
+      "prob_flip": 0.1
+    }
+  }
+}
+
+templates\luces_auto.json----------------------------------------
+{
+  "serial_prefix": "LGT0",
+  "nombre": "Luces Automáticas",
+  "tipo": "actuador",
+  "modelo": "LGT-300",
+  "descripcion": "Sistema de iluminación con encendido y apagado automático",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+      { "dias": ["todos"], "inicio": "18:00", "fin": "06:00" }
+    ]
+  },
+  "parametros": {}
+}
+
+templates\persiana_auto.json----------------------------------------
+{
+  "serial_prefix": "SHD0",
+  "nombre": "Persiana Inteligente",
+  "tipo": "actuador",
+  "modelo": "SHD-400",
+  "descripcion": "Control de apertura y cierre de persianas",
+  "configuracion": {
+    "intervalo_envio": 8,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+  }
+}
+
+templates\puerta_auto.json----------------------------------------
+{
+  "serial_prefix": "DRL0",
+  "nombre": "Puerta Inteligente",
+  "tipo": "actuador",
+  "modelo": "DR-200",
+  "descripcion": "Puerta con cerradura inteligente y control remoto",
+  "configuracion": {
+    "intervalo_envio": 12,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+
+  }
+}
+
+templates\regador_auto.json----------------------------------------
+{
+  "serial_prefix": "RGD0",
+  "nombre": "Regador Automático",
+  "tipo": "actuador",
+  "modelo": "RG-500",
+  "descripcion": "Sistema automático de riego programado",
+  "configuracion": {
+    "intervalo_envio": 20,
+    "encendido": false,
+    "modo": "manual",
+    "horarios": [
+      { "dias": ["lunes","miercoles","viernes"], "inicio": "06:00", "fin": "06:15" }
+    ]
+  },
+  "parametros": {}
+}
+
+templates\sensor_co2.json----------------------------------------
+{
+  "serial_prefix": "CO20",
+  "nombre": "Sensor de CO₂",
+  "tipo": "sensor",
+  "modelo": "C2-300",
+  "descripcion": "Medidor de concentración de dióxido de carbono en ppm",
+  "configuracion": {
+    "intervalo_envio": 12,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "co2_ppm": {
+      "tipo": "int",
+      "min": 0,
+      "max": 800,
+      "variacion": 50
+    }
+  }
+}
+
+templates\sensor_humo.json----------------------------------------
+{
+  "serial_prefix": "SMK0",
+  "nombre": "Detector de Humo",
+  "tipo": "sensor",
+  "modelo": "SM-150",
+  "descripcion": "Alarma contra incendios",
+  "configuracion": {
+    "intervalo_envio": 20,
+    "encendido": true,
+    "modo": "manual"
+  },
+  "parametros": {
+    "humo_detectado": {
+      "tipo": "boolean",
+      "prob_flip": 0.002
+    }
+  }
+}
+
+templates\sensor_luz.json----------------------------------------
+{
+  "serial_prefix": "LUX0",
+  "nombre": "Sensor de Luz",
+  "tipo": "sensor",
+  "modelo": "LX-500",
+  "descripcion": "Sensor de intensidad luminosa en lux",
+  "configuracion": {
+    "intervalo_envio": 8,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "luz_lux": {
+      "tipo": "float",
+      "min": 0.0,
+      "max": 500.0,
+      "variacion": 20.0
+    }
+  }
+}
+
+templates\sensor_mov.json----------------------------------------
+{
+  "serial_prefix": "MOV0",
+  "nombre": "Sensor de Movimiento",
+  "tipo": "sensor",
+  "modelo": "MOV-200",
+  "descripcion": "Sensor binario de movimiento",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": true,
+    "modo": "manual",
+    "horarios": [
+    {"dias": ["todos"], "inicio": "21:25", "fin": "21:30"}
+  ]
+  },
+  "parametros": {
+    "movimiento": {
+      "tipo": "boolean",
+      "prob_flip": 0.01
+    }
+  }
+}
+
+templates\sensor_ruido.json----------------------------------------
+{
+  "serial_prefix": "SND0",
+  "nombre": "Sensor de Ruido",
+  "tipo": "sensor",
+  "modelo": "SN-200",
+  "descripcion": "Medidor de niveles sonoros en decibeles",
+  "configuracion": {
+    "intervalo_envio": 7,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "db": {
+      "tipo": "float",
+      "min": 30.0,
+      "max": 80.0,
+      "variacion": 5.0
+    }
+  }
+}
+
+templates\sensor_smart-plug.json----------------------------------------
+{
+  "serial_prefix": "PLG0",
+  "nombre": "Smart Plug",
+  "tipo": "actuador",
+  "modelo": "SP-100",
+  "descripcion": "Medidor de consumo electrico",
+  "configuracion": {
+    "intervalo_envio": 6,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "consumo_w": {
+      "tipo": "float",
+      "min": 0.0,
+      "max": 2000.0,
+      "variacion": 50.0
+    }
+  }
+}
+
+templates\sensor_temp.json----------------------------------------
+{
+  "serial_prefix": "TMP0",
+  "nombre": "Sensor de Temperatura Generico",
+  "tipo": "sensor",
+  "modelo": "ST-1000",
+  "descripcion": "Sensor de temperatura",
+  "configuracion": {
+    "intervalo_envio": 5,
+    "encendido": true,
+    "modo": "manual"
+
+  },
+  "parametros": {
+    "temperatura": {
+      "tipo": "float",
+      "min": 20.0,
+      "max": 30.0,
+      "variacion": 0.3
+    },
+    "humedad": {
+      "tipo": "int",
+      "min": 35,
+      "max": 65,
+      "variacion": 2
+    }
+  }
+}
+
+templates\vent_auto.json----------------------------------------
+{
+  "serial_prefix": "FAN0",
+  "nombre": "Ventilador Inteligente",
+  "tipo": "actuador",
+  "modelo": "FAN-300",
+  "descripcion": "Ventilador con control de velocidad inteligente",
+  "configuracion": {
+    "intervalo_envio": 10,
+    "encendido": false,
+    "modo": "manual"
+  },
+  "parametros": {
+    "velocidad": {
+      "tipo": "int",
+      "min": 0,
+      "max": 3,
+      "variacion": 1
+    }
+  }
+}
+
