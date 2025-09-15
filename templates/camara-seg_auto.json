@@ -17,7 +17,7 @@
   "parametros": {
     "stream_activo": {
       "tipo": "boolean",
-      "prob_flip": 0.02
+      "prob_flip": 0.90
     },
     "alertas_movimiento": {
       "tipo": "boolean",

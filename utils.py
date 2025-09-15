@@ -131,13 +131,9 @@ def modificar_dispositivo():
         # Normalización de modo
         modo = config_actual.get("modo")
         if modo == "horario" and "encendido" in config_actual:
-            # Si es horario → eliminamos encendido
-            del config_actual["encendido"]
-            print(" ✅Cambiado 'modo': 'horario';  ❌Eliminado 'encendido'")
+            print(" ✅Cambiado 'modo': 'horario'")
         elif modo == "manual" and "horarios" in config_actual:
-            # Si es manual → eliminamos horarios
-            del config_actual["horarios"]
-            print(" ✅Cambiado 'modo': 'Manual' ❌Eliminado 'horarios'")
+            print(" ✅Cambiado 'modo': 'Manual'")
 
         payload = {"configuracion": config_actual}
 
@@ -149,6 +145,8 @@ def modificar_dispositivo():
             return
         payload = {campo: nuevo_valor}
 
+    # ... después de construir 'payload' (dict) ...
+    # ... tras construir 'payload' (dict) ...
     print("📤 Enviando actualización al backend...")
 
     try:
@@ -161,3 +159,5 @@ def modificar_dispositivo():
         ])
     except Exception as e:
         print(f"❌ Error al ejecutar script PowerShell: {e}")
+
+

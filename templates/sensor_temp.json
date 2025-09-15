@@ -19,8 +19,8 @@
     },
     "humedad": {
       "tipo": "int",
-      "min": 30,
-      "max": 70,
+      "min": 35,
+      "max": 65,
       "variacion": 2
     }
   }

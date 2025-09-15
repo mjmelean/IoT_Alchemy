@@ -147,22 +147,31 @@ class DeviceSimulator:
             print(f"[CFG] Error buscando ID para {self.serial}: {e}")
 
     def _sync_encendido_to_backend(self, cfg):
-        """Sincroniza encendido al backend solo si cambió."""
+        """Sincroniza encendido (y estado) al backend solo si cambió."""
         if not (self.backend_url and self._device_id is not None):
             return
+
         new_val = bool(cfg.get("encendido"))
         if self._last_encendido_sync is not None and self._last_encendido_sync == new_val:
             return  # no hay cambios
+
+        # 🔸 Enviar estado explícito si estamos en modo horario
+        payload = {"configuracion": cfg, "encendido": new_val}
+        modo = (cfg.get("modo") or "").lower()
+        if modo == "horario":
+            payload["estado"] = "activo" if new_val else "inactivo"
+
         try:
             resp = requests.put(
                 f"{self.backend_url}/dispositivos/{self._device_id}",
-                json={"configuracion": cfg, "encendido": new_val},
+                json=payload,
                 timeout=5
             )
             if resp.status_code in (200, 204):
                 self._last_encendido_sync = new_val
         except Exception as e:
             print(f"[CFG] Error sincronizando estado con backend: {e}")
+
 
     def _aplicar_config(self, cfg):
         # Si no hay modo → dispositivo no reclamado todavía
@@ -212,6 +221,7 @@ class DeviceSimulator:
             # Estado manda
             self.apagado = not activo
             cfg["encendido"] = activo
+            cfg["modo"] = "horario"  # 🔸 asegurar que el modo viaja
             self._sync_encendido_to_backend(cfg)
 
         # Intervalo de envío

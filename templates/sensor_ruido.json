@@ -14,7 +14,7 @@
     "db": {
       "tipo": "float",
       "min": 30.0,
-      "max": 120.0,
+      "max": 80.0,
       "variacion": 5.0
     }
   }

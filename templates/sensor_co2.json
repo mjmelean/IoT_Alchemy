@@ -13,8 +13,8 @@
   "parametros": {
     "co2_ppm": {
       "tipo": "int",
-      "min": 400,
-      "max": 2000,
+      "min": 0,
+      "max": 800,
       "variacion": 50
     }
   }

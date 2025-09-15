@@ -14,7 +14,7 @@
     "luz_lux": {
       "tipo": "float",
       "min": 0.0,
-      "max": 1000.0,
+      "max": 500.0,
       "variacion": 20.0
     }
   }
