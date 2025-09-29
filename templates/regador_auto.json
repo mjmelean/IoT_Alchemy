@@ -7,10 +7,7 @@
   "configuracion": {
     "intervalo_envio": 20,
     "encendido": false,
-    "modo": "manual",
-    "horarios": [
-      { "dias": ["lunes","miercoles","viernes"], "inicio": "06:00", "fin": "06:15" }
-    ]
+    "modo": "manual"
   },
   "parametros": {}
 }
