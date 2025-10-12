@@ -200,6 +200,13 @@ Cada dispositivo en **IoT Alchemy** tiene un bloque `configuracion` que define s
     { "dias": ["jueves", "viernes"], "inicio": "06:00", "fin": "21:30" }
   ]
   ```
+  ```json
+  "horarios": [
+    { "dias": ["lunes"], "inicio": "08:00", "fin": "12:00" }
+    { "dias": ["lunes"], "inicio": "13:00", "fin": "18:00" }
+    { "dias": ["jueves", "viernes"], "inicio": "06:00", "fin": "21:30" }
+  ]
+  ```
     ```json
   "horarios": [
     { "dias": ["todos"], "inicio": "20:00", "fin": "23:00" }
