@@ -5,12 +5,14 @@
   "modelo": "LGT-300",
   "descripcion": "Sistema de iluminación con encendido y apagado automático",
   "configuracion": {
+    "capability": "binary",
+    "tipo": "luz",
     "intervalo_envio": 10,
-    "encendido": true,
-    "modo": "manual",
-    "horarios": [
-      { "dias": ["todos"], "inicio": "18:00", "fin": "06:00" }
-    ]
+    "modo": "horario",
+    "auto_off_min": 0,
+    "horarios": {
+      "diario": [["18:00","on"],["06:00","off"]]
+    }
   },
   "parametros": {}
 }

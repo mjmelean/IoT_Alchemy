@@ -5,17 +5,12 @@
   "modelo": "MOV-200",
   "descripcion": "Sensor binario de movimiento",
   "configuracion": {
+    "capability" : "sensor",
+    "tipo": "sensor",
     "intervalo_envio": 10,
-    "encendido": true,
-    "modo": "manual",
-    "horarios": [
-    {"dias": ["todos"], "inicio": "21:25", "fin": "21:30"}
-  ]
+    "modo": "manual"
   },
   "parametros": {
-    "movimiento": {
-      "tipo": "boolean",
-      "prob_flip": 0.01
-    }
+    "movimiento": { "tipo": "boolean", "prob_flip": 0.01 }
   }
 }

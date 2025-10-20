@@ -5,17 +5,16 @@
   "modelo": "SP-100",
   "descripcion": "Medidor de consumo electrico",
   "configuracion": {
+    "capability" : "binary",
+    "tipo": "enchufe",
     "intervalo_envio": 6,
-    "encendido": true,
-    "modo": "manual"
-
+    "modo": "horario",
+    "auto_off_min": 0,
+    "horarios": {
+      "diario": [["18:00","on"],["23:00","off"]]
+    }
   },
   "parametros": {
-    "consumo_w": {
-      "tipo": "float",
-      "min": 0.0,
-      "max": 2000.0,
-      "variacion": 50.0
-    }
+    "consumo_w": { "tipo": "float", "min": 0.0, "max": 2000.0, "variacion": 50.0 }
   }
 }

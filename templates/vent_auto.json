@@ -5,16 +5,17 @@
   "modelo": "FAN-300",
   "descripcion": "Ventilador con control de velocidad inteligente",
   "configuracion": {
+    "capabilities": "speed",
+    "tipo": "ventilador",
     "intervalo_envio": 10,
-    "encendido": false,
-    "modo": "manual"
+    "modo": "horario",
+    "speed_levels" : 3,
+    "default_speed" : 1,
+    "horarios_speed": {
+      "diario": [["14:00",2],["23:30",0]]
+    }
   },
   "parametros": {
-    "velocidad": {
-      "tipo": "int",
-      "min": 0,
-      "max": 3,
-      "variacion": 1
-    }
+    "velocidad": { "tipo": "int", "min": 0, "max": 3, "variacion": 1 }
   }
 }

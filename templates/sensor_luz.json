@@ -5,17 +5,12 @@
   "modelo": "LX-500",
   "descripcion": "Sensor de intensidad luminosa en lux",
   "configuracion": {
+    "capability" : "sensor",
+    "tipo": "sensor",
     "intervalo_envio": 8,
-    "encendido": true,
     "modo": "manual"
-
   },
   "parametros": {
-    "luz_lux": {
-      "tipo": "float",
-      "min": 0.0,
-      "max": 500.0,
-      "variacion": 20.0
-    }
+    "luz_lux": { "tipo": "float", "min": 0.0, "max": 500.0, "variacion": 20.0 }
   }
 }

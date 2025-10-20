@@ -5,11 +5,14 @@
   "modelo": "DR-200",
   "descripcion": "Puerta con cerradura inteligente y control remoto",
   "configuracion": {
+    "capability": "lock",
+    "tipo": "puerta",
     "intervalo_envio": 12,
-    "encendido": true,
-    "modo": "manual"
+    "modo": "horario",
+    "auto_lock_min": 2,
+    "horarios_lock": {
+      "diario": [["22:00","lock"],["07:00","unlock"]]
+    }
   },
-  "parametros": {
-
-  }
+  "parametros": {}
 }

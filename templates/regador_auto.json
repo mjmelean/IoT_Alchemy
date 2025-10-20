@@ -5,9 +5,17 @@
   "modelo": "RG-500",
   "descripcion": "Sistema automático de riego programado",
   "configuracion": {
+    "capabilities": "duration",
+    "tipo": "riego",
     "intervalo_envio": 20,
-    "encendido": false,
-    "modo": "manual"
+    "modo": "horario",
+    "minutos_defecto": 10,
+    "max_duration_min": 20,
+    "cooldown_min": 60,
+    "horarios_riego": {
+      "sabado": [["06:30",10]],
+      "domingo": [["06:30",10]]
+    }
   },
   "parametros": {}
 }

@@ -5,23 +5,22 @@
   "modelo": "CAM-900",
   "descripcion": "Cámara IP con transmisión de video y detección de movimiento",
   "configuracion": {
+    "capability": "binary",
+    "tipo": "camara",
     "intervalo_envio": 15,
-    "encendido": true,
-    "modo": "manual",
-    "horarios": [
-      {"dias": ["sabado","domingo"], "inicio": "00:00", "fin": "23:59"},
-      {"dias": ["lunes","martes","miercoles","jueves","viernes"], "inicio": "20:00", "fin": "07:00"}
-]
-
+    "modo": "horario",
+    "horarios": {
+      "sabado": [["00:00","on"],["23:59","off"]],
+      "domingo": [["00:00","on"],["23:59","off"]],
+      "lunes": [["20:00","on"],["07:00","off"]],
+      "martes": [["20:00","on"],["07:00","off"]],
+      "miercoles": [["20:00","on"],["07:00","off"]],
+      "jueves": [["20:00","on"],["07:00","off"]],
+      "viernes": [["20:00","on"],["07:00","off"]]
+    }
   },
   "parametros": {
-    "stream_activo": {
-      "tipo": "boolean",
-      "prob_flip": 0.90
-    },
-    "alertas_movimiento": {
-      "tipo": "boolean",
-      "prob_flip": 0.1
-    }
+    "stream_activo": { "tipo": "boolean", "prob_flip": 0.90 },
+    "alertas_movimiento": { "tipo": "boolean", "prob_flip": 0.1 }
   }
 }

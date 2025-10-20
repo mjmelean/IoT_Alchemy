@@ -5,17 +5,11 @@
   "modelo": "C2-300",
   "descripcion": "Medidor de concentración de dióxido de carbono en ppm",
   "configuracion": {
-    "intervalo_envio": 12,
-    "encendido": true,
-    "modo": "manual"
-
+    "capability": "sensor",
+    "tipo": "sensor",
+    "intervalo_envio": 12
   },
   "parametros": {
-    "co2_ppm": {
-      "tipo": "int",
-      "min": 0,
-      "max": 800,
-      "variacion": 50
-    }
+    "co2_ppm": { "tipo": "int", "min": 0, "max": 800, "variacion": 50 }
   }
 }

@@ -1,44 +1,33 @@
 ﻿param(
-    [string]$serial_number,
-    [string]$nombre,
-    [string]$tipo,
-    [string]$modelo,
-    [string]$descripcion,
-    [string]$configuracion
+    [Parameter(Mandatory = $true)]
+    [string]$payloadPath
 )
 
 # Cargar config.json
 $configPath = Join-Path $PSScriptRoot "..\config.json"
-$config = Get-Content $configPath | ConvertFrom-Json
+$config     = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
 $backendUrl = $config.backend_url.TrimEnd('/')
 
-# Construir el body como hashtable
-$body = @{
-    serial_number = $serial_number
-    nombre        = $nombre
-    tipo          = $tipo
-    modelo        = $modelo
-    descripcion   = $descripcion
-    configuracion = (ConvertFrom-Json $configuracion)
+# Leer payload desde archivo
+if (-not (Test-Path -LiteralPath $payloadPath)) {
+    Write-Host "❌ No existe el archivo de payload: $payloadPath" -ForegroundColor Red
+    exit 1
 }
-
-# Convertir a JSON
-$json = $body | ConvertTo-Json -Depth 5 -Compress
+$payloadJson = Get-Content -LiteralPath $payloadPath -Raw
 
 Write-Host "📤 Enviando payload al backend..."
-Write-Host $json
+Write-Host $payloadJson
 Write-Host "🌍 Usando backend: $backendUrl"
 
-# Ejecutar POST
 try {
     $response = Invoke-RestMethod -Uri "$backendUrl/dispositivos/reclamar" `
                                   -Method POST `
-                                  -Body $json `
+                                  -Body $payloadJson `
                                   -ContentType 'application/json; charset=utf-8'
-
     Write-Host "✅ Respuesta del backend:"
-    $response | ConvertTo-Json -Depth 5
+    $response | ConvertTo-Json -Depth 10
 }
 catch {
-    Write-Host "❌ Error al enviar request: $_"
+    Write-Host "❌ Error al enviar request: $_" -ForegroundColor Red
+    exit 1
 }

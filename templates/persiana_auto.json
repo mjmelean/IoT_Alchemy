@@ -5,10 +5,15 @@
   "modelo": "SHD-400",
   "descripcion": "Control de apertura y cierre de persianas",
   "configuracion": {
+    "capability": "position",
+    "tipo": "persiana",
     "intervalo_envio": 8,
-    "encendido": true,
-    "modo": "manual"
+    "modo": "horario",
+    "invert_direction": false,
+    "travel_time_sec": 18,
+    "horarios_pos": {
+      "diario": [["07:30",100],["22:30",0]]
+    }
   },
-  "parametros": {
-  }
+  "parametros": {}
 }

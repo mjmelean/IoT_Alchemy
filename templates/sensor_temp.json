@@ -5,23 +5,13 @@
   "modelo": "ST-1000",
   "descripcion": "Sensor de temperatura",
   "configuracion": {
+    "capability": "sensor",
+    "tipo": "sensor",
     "intervalo_envio": 5,
-    "encendido": true,
     "modo": "manual"
-
   },
   "parametros": {
-    "temperatura": {
-      "tipo": "float",
-      "min": 20.0,
-      "max": 30.0,
-      "variacion": 0.3
-    },
-    "humedad": {
-      "tipo": "int",
-      "min": 35,
-      "max": 65,
-      "variacion": 2
-    }
+    "temperatura": { "tipo": "float", "min": 20.0, "max": 30.0, "variacion": 0.3 },
+    "humedad": { "tipo": "int", "min": 35, "max": 65, "variacion": 2 }
   }
 }

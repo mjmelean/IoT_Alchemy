@@ -5,14 +5,12 @@
   "modelo": "SM-150",
   "descripcion": "Alarma contra incendios",
   "configuracion": {
-    "intervalo_envio": 20,
-    "encendido": true,
+    "capability" : "sensor",
+    "tipo": "sensor",
+    "intervalo_envio": 10,
     "modo": "manual"
   },
   "parametros": {
-    "humo_detectado": {
-      "tipo": "boolean",
-      "prob_flip": 0.002
-    }
+    "humo_detectado": { "tipo": "boolean", "prob_flip": 0.002 }
   }
 }

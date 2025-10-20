@@ -5,17 +5,12 @@
   "modelo": "SN-200",
   "descripcion": "Medidor de niveles sonoros en decibeles",
   "configuracion": {
+    "capability" : "sensor",
+    "tipo": "sensor",
     "intervalo_envio": 7,
-    "encendido": true,
     "modo": "manual"
-
   },
   "parametros": {
-    "db": {
-      "tipo": "float",
-      "min": 30.0,
-      "max": 80.0,
-      "variacion": 5.0
-    }
+    "db": { "tipo": "float", "min": 30.0, "max": 80.0, "variacion": 5.0 }
   }
 }
